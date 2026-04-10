@@ -57,11 +57,22 @@ export default function Profile() {
     setGarminMsg('')
     const { data: { user: u } } = await supabase.auth.getUser()
     const { data, error } = await supabase.functions.invoke('sync-garmin', { body: {} })
-    if (error || !data?.success) {
-      setGarminMsg(data?.error || error?.message || 'Error al sincronizar')
+
+    if (error) {
+      // Extract the real error message from the response body when available
+      let msg = error.message || 'Error al sincronizar'
+      try {
+        if (error.context && typeof error.context.json === 'function') {
+          const body = await error.context.json()
+          if (body?.error) msg = body.error
+        }
+      } catch { /* keep original msg */ }
+      setGarminMsg(msg)
+    } else if (!data?.success) {
+      setGarminMsg(data?.error || 'La sincronización falló')
     } else {
       setGarminMsg(`✓ Sincronizado: ${data.sessions_synced} actividades, ${data.metrics_synced} días`)
-      await loadGarmin(u.id)
+      if (u) await loadGarmin(u.id)
     }
     setGarminAction('')
   }

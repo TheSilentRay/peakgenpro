@@ -22,14 +22,14 @@ serve(async (req) => {
     })
   }
 
-  const userSupabase = createClient(
+  const supabaseAdmin = createClient(
     Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_ANON_KEY")!,
-    { global: { headers: { Authorization: authHeader } } }
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
   )
-  const { data: { user } } = await userSupabase.auth.getUser()
-  if (!user) {
-    return new Response(JSON.stringify({ error: "Token inválido" }), {
+  const token = authHeader.replace("Bearer ", "")
+  const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token)
+  if (authError || !user) {
+    return new Response(JSON.stringify({ error: "Token inválido o sesión expirada" }), {
       status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" }
     })
   }

@@ -26,7 +26,7 @@ serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
   )
 
-  // Validate JWT from Supabase client (auto-sent by supabase.functions.invoke)
+  // Validate JWT using the service role client — no SUPABASE_ANON_KEY needed
   const authHeader = req.headers.get("Authorization")
   if (!authHeader) {
     return new Response(JSON.stringify({ success: false, error: "No autorizado" }), {
@@ -34,15 +34,10 @@ serve(async (req) => {
     })
   }
 
-  // Verify the token and get the user
-  const userSupabase = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_ANON_KEY")!,
-    { global: { headers: { Authorization: authHeader } } }
-  )
-  const { data: { user: authUser } } = await userSupabase.auth.getUser()
-  if (!authUser) {
-    return new Response(JSON.stringify({ success: false, error: "Token inválido" }), {
+  const token = authHeader.replace("Bearer ", "")
+  const { data: { user: authUser }, error: authError } = await supabase.auth.getUser(token)
+  if (authError || !authUser) {
+    return new Response(JSON.stringify({ success: false, error: "Token inválido o sesión expirada" }), {
       status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" }
     })
   }
