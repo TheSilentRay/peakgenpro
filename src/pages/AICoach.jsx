@@ -57,11 +57,12 @@ export default function AICoach() {
         body: { messages: newMessages, athleteData },
       })
 
+      // Surface the real error from the function body when available
+      if (data?.error) throw new Error(data.error)
       if (error) throw new Error(error.message || 'Error al contactar el coach')
 
       const assistantText =
         data?.content?.find(b => b.type === 'text')?.text ||
-        data?.error ||
         'No se pudo obtener respuesta.'
 
       setMessages(prev => [...prev, { role: 'assistant', content: assistantText }])
