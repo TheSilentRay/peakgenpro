@@ -52,14 +52,19 @@ export default function AICoach() {
     setLoading(true)
 
     try {
-      // Call the secure Edge Function proxy (never exposes API key to browser)
-      const { data, error } = await supabase.functions.invoke('ai-coach', {
-        body: { messages: newMessages, athleteData },
+      // Call the Vercel API route proxy (never exposes API key to browser)
+      const { data: { session } } = await supabase.auth.getSession()
+      const coachRes = await fetch('/api/ai-coach', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({ messages: newMessages, athleteData }),
       })
+      const data = await coachRes.json()
 
-      // Surface the real error from the function body when available
-      if (data?.error) throw new Error(data.error)
-      if (error) throw new Error(error.message || 'Error al contactar el coach')
+      if (!coachRes.ok) throw new Error(data?.error || 'Error al contactar el coach')
 
       const assistantText =
         data?.content?.find(b => b.type === 'text')?.text ||

@@ -56,23 +56,27 @@ export default function Profile() {
     setGarminAction('syncing')
     setGarminMsg('')
     const { data: { user: u } } = await supabase.auth.getUser()
-    const { data, error } = await supabase.functions.invoke('sync-garmin', { body: {} })
+    const { data: { session } } = await supabase.auth.getSession()
 
-    if (error) {
-      // Extract the real error message from the response body when available
-      let msg = error.message || 'Error al sincronizar'
-      try {
-        if (error.context && typeof error.context.json === 'function') {
-          const body = await error.context.json()
-          if (body?.error) msg = body.error
-        }
-      } catch { /* keep original msg */ }
-      setGarminMsg(msg)
-    } else if (!data?.success) {
-      setGarminMsg(data?.error || 'La sincronización falló')
-    } else {
-      setGarminMsg(`✓ Sincronizado: ${data.sessions_synced} actividades, ${data.metrics_synced} días`)
-      if (u) await loadGarmin(u.id)
+    try {
+      const syncRes = await fetch('/api/sync-garmin', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({}),
+      })
+      const data = await syncRes.json()
+
+      if (!syncRes.ok || !data?.success) {
+        setGarminMsg(data?.error || 'La sincronización falló')
+      } else {
+        setGarminMsg(`✓ Sincronizado: ${data.sessions_synced} actividades, ${data.metrics_synced} días`)
+        if (u) await loadGarmin(u.id)
+      }
+    } catch (err) {
+      setGarminMsg(err.message || 'Error al sincronizar')
     }
     setGarminAction('')
   }

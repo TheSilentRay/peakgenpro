@@ -29,13 +29,19 @@ export default function GarminConnect() {
 
       if (credError) throw new Error(`Error guardando credenciales: ${credError.message}`)
 
-      // Invoke the sync Edge Function — this does the real Garmin API calls
-      const { data: syncData, error: syncError } = await supabase.functions.invoke('sync-garmin', {
-        body: {}, // user_id is taken from JWT inside the function
+      // Call the Vercel API route — does the real Garmin API calls server-side
+      const { data: { session } } = await supabase.auth.getSession()
+      const syncRes = await fetch('/api/sync-garmin', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({}),
       })
+      const syncData = await syncRes.json()
 
-      if (syncError) throw new Error(syncError.message || 'Error en la sincronización')
-      if (!syncData?.success) throw new Error(syncData?.error || 'La sincronización falló sin mensaje de error')
+      if (!syncRes.ok || !syncData?.success) throw new Error(syncData?.error || 'La sincronización falló sin mensaje de error')
 
       setSyncStats(syncData)
       setStep('done')
