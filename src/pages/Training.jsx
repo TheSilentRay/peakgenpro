@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import AppLayout from '../components/AppLayout'
 import { supabase, getTrainingSessions, getDailyMetrics } from '../lib/supabase'
 import { DEMO_SESSIONS, DEMO_METRICS } from '../lib/demoData'
@@ -11,6 +11,8 @@ const ZONES = [
   { name: 'Z4 Umbral', color: '#FF8C47', range: '155–168 bpm', pct: 12 },
   { name: 'Z5 VO2max', color: '#ff6b6b', range: '> 168 bpm', pct: 4 },
 ]
+
+const DAYS_ES = ['D', 'L', 'M', 'X', 'J', 'V', 'S'] // getDay() 0=Sun
 
 export default function Training() {
   const [sessions, setSessions] = useState(DEMO_SESSIONS)
@@ -24,11 +26,28 @@ export default function Training() {
     })
   }, [])
 
-  const weeklyLoad = metrics.slice(-8).map((m, i) => ({
-    day: ['L','M','X','J','V','S','D','H'][i],
-    tss: Math.round(40 + Math.random() * 80),
-    readiness: m.readiness_score
-  }))
+  // Build daily TSS from real session data
+  const sessionTssByDate: Record<string, number> = {}
+  sessions.forEach(s => {
+    const d = (s.start_time || s.date || '').slice(0, 10)
+    if (d) sessionTssByDate[d] = (sessionTssByDate[d] || 0) + (s.tss || 0)
+  })
+
+  const weeklyLoad = metrics.slice(-8).map((m, i) => {
+    const date = m.date || ''
+    const dayIndex = date ? new Date(date + 'T12:00:00').getDay() : i
+    return {
+      day: DAYS_ES[dayIndex],
+      tss: sessionTssByDate[date] || 0,
+      readiness: m.readiness_score || 0,
+    }
+  })
+
+  const recentSessions = sessions.slice(0, 7)
+  const totalDistance = recentSessions.reduce((s, a) => s + (a.distance_km || 0), 0)
+  const totalMinutes = recentSessions.reduce((s, a) => s + (a.duration_min || 0), 0)
+  const totalTss = recentSessions.reduce((s, a) => s + (a.tss || 0), 0)
+  const totalCalories = recentSessions.reduce((s, a) => s + (a.calories || 0), 0)
 
   const activityIcon = t => ({ running: '🏃', cycling: '🚴', swimming: '🏊', strength: '💪' }[t] || '⚡')
   const activityColor = t => ({ running: '#00E5A0', cycling: '#5BB8FF', swimming: '#b088ff', strength: '#FFB347' }[t] || '#00E5A0')
@@ -73,15 +92,15 @@ export default function Training() {
           </div>
         </div>
 
-        {/* Session stats */}
+        {/* Weekly summary */}
         <div style={{ background: '#0D1316', border: '1px solid rgba(0,229,160,0.1)', borderRadius: 10, padding: 20 }}>
           <div style={{ fontSize: 11, fontFamily: "'JetBrains Mono',monospace", color: '#7A8E88', letterSpacing: .5, marginBottom: 16 }}>RESUMEN SEMANAL</div>
           {[
-            { label: 'VOLUMEN TOTAL', value: `${sessions.slice(0,5).reduce((s,a) => s + (a.distance_km||0), 0).toFixed(1)} km` },
-            { label: 'TIEMPO ACTIVO', value: `${Math.round(sessions.slice(0,5).reduce((s,a) => s + (a.duration_min||0), 0) / 60)}h ${sessions.slice(0,5).reduce((s,a) => s + (a.duration_min||0), 0) % 60}min` },
-            { label: 'TSS ACUMULADO', value: `${sessions.slice(0,5).reduce((s,a) => s + (a.tss||0), 0)}` },
-            { label: 'CALORÍAS', value: `${sessions.slice(0,5).reduce((s,a) => s + (a.calories||0), 0).toLocaleString()} kcal` },
-            { label: 'SESIONES', value: `${sessions.slice(0,5).length}` },
+            { label: 'VOLUMEN TOTAL', value: `${totalDistance.toFixed(1)} km` },
+            { label: 'TIEMPO ACTIVO', value: `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}min` },
+            { label: 'TSS ACUMULADO', value: `${totalTss}` },
+            { label: 'CALORÍAS', value: `${totalCalories.toLocaleString()} kcal` },
+            { label: 'SESIONES', value: `${recentSessions.length}` },
           ].map(item => (
             <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
               <span style={{ fontSize: 11, fontFamily: "'JetBrains Mono',monospace", color: '#7A8E88', letterSpacing: .5 }}>{item.label}</span>
@@ -102,14 +121,16 @@ export default function Training() {
               </div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 13, fontWeight: 500, textTransform: 'capitalize', marginBottom: 2 }}>{s.activity_type}</div>
-                <div style={{ fontSize: 11, color: '#7A8E88' }}>{new Date(s.date || s.start_time).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })}</div>
+                <div style={{ fontSize: 11, color: '#7A8E88' }}>
+                  {new Date(s.start_time || s.date).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })}
+                </div>
               </div>
               {[
-                s.distance_km > 0 && { label: 'Distancia', val: `${s.distance_km}km` },
+                s.distance_km > 0 ? { label: 'Distancia', val: `${s.distance_km}km` } : null,
                 { label: 'Duración', val: `${s.duration_min}min` },
-                { label: 'FC avg', val: `${s.avg_hr}bpm` },
-                { label: 'TSS', val: s.tss },
-                { label: 'kcal', val: s.calories },
+                s.avg_hr ? { label: 'FC avg', val: `${s.avg_hr}bpm` } : null,
+                s.tss ? { label: 'TSS', val: s.tss } : null,
+                s.calories ? { label: 'kcal', val: s.calories } : null,
               ].filter(Boolean).map(item => (
                 <div key={item.label} style={{ textAlign: 'center', minWidth: 60 }}>
                   <div style={{ fontSize: 13, fontFamily: "'JetBrains Mono',monospace", color: activityColor(s.activity_type) }}>{item.val}</div>

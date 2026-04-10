@@ -18,22 +18,25 @@ export default function Recovery() {
   }, [])
 
   const hrvData = metrics.slice(-14).map(m => ({ date: m.date?.slice(5), hrv: m.hrv_ms, baseline: 58 }))
-  const sleepData = metrics.slice(-7).map(m => ({
-    date: m.date?.slice(5),
-    total: m.sleep_hours,
-    score: m.sleep_score
-  }))
 
-  const sleepStages = [
-    { name: 'Sueño profundo', hours: 1.4, color: '#5BB8FF', pct: 18 },
-    { name: 'REM', hours: 1.8, color: '#b088ff', pct: 23 },
-    { name: 'Sueño ligero', hours: 3.9, color: '#00E5A0', pct: 50 },
-    { name: 'Despierto', hours: 0.7, color: '#FFB347', pct: 9 },
-  ]
-
-  const recovScore = today.readiness_score
+  const recovScore = today.readiness_score || 0
   const scoreColor = recovScore >= 70 ? '#00E5A0' : recovScore >= 50 ? '#FFB347' : '#ff6b6b'
   const scoreLabel = recovScore >= 70 ? 'ÓPTIMO' : recovScore >= 50 ? 'MODERADO' : 'BAJO'
+
+  // Build sleep stages from real data when available, fall back to proportional estimates
+  const totalSleep = today.sleep_hours || 7.8
+  const deepHours = today.sleep_deep_hours ?? parseFloat((totalSleep * 0.18).toFixed(2))
+  const remHours = today.sleep_rem_hours ?? parseFloat((totalSleep * 0.23).toFixed(2))
+  const lightHours = today.sleep_light_hours ?? parseFloat((totalSleep * 0.50).toFixed(2))
+  const awakeHours = today.sleep_awake_hours ?? parseFloat((totalSleep * 0.09).toFixed(2))
+  const stageTotalHours = deepHours + remHours + lightHours + awakeHours || totalSleep
+
+  const sleepStages = [
+    { name: 'Sueño profundo', hours: deepHours, color: '#5BB8FF', pct: Math.round((deepHours / stageTotalHours) * 100) },
+    { name: 'REM', hours: remHours, color: '#b088ff', pct: Math.round((remHours / stageTotalHours) * 100) },
+    { name: 'Sueño ligero', hours: lightHours, color: '#00E5A0', pct: Math.round((lightHours / stageTotalHours) * 100) },
+    { name: 'Despierto', hours: awakeHours, color: '#FFB347', pct: Math.round((awakeHours / stageTotalHours) * 100) },
+  ]
 
   return (
     <AppLayout>
@@ -46,7 +49,7 @@ export default function Recovery() {
         {/* Big score */}
         <div style={{ background: '#0D1316', border: `1px solid ${scoreColor}30`, borderRadius: 10, padding: 24, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
           <div style={{ fontSize: 11, fontFamily: "'JetBrains Mono',monospace", color: '#7A8E88', letterSpacing: .5, marginBottom: 12 }}>HOY</div>
-          <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 72, lineHeight: 1, color: scoreColor }}>{recovScore}</div>
+          <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 72, lineHeight: 1, color: scoreColor }}>{recovScore || '—'}</div>
           <div style={{ fontSize: 12, fontFamily: "'JetBrains Mono',monospace", color: scoreColor, letterSpacing: 1, marginTop: 8 }}>{scoreLabel}</div>
         </div>
 
@@ -54,19 +57,27 @@ export default function Recovery() {
         <div style={{ background: '#0D1316', border: '1px solid rgba(0,229,160,0.1)', borderRadius: 10, padding: 20 }}>
           <div style={{ fontSize: 11, fontFamily: "'JetBrains Mono',monospace", color: '#7A8E88', letterSpacing: .5, marginBottom: 4 }}>HRV TREND — 14 DÍAS</div>
           <div style={{ display: 'flex', gap: 20, marginBottom: 12 }}>
-            <div><span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 28, color: '#5BB8FF' }}>{today.hrv_ms}ms</span><span style={{ fontSize: 12, color: '#7A8E88', marginLeft: 6 }}>hoy</span></div>
-            <div><span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 28, color: '#7A8E88' }}>{Math.round(metrics.slice(-7).reduce((s,m)=>s+m.hrv_ms,0)/7)}ms</span><span style={{ fontSize: 12, color: '#7A8E88', marginLeft: 6 }}>promedio 7d</span></div>
+            <div>
+              <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 28, color: '#5BB8FF' }}>{today.hrv_ms ?? '—'}ms</span>
+              <span style={{ fontSize: 12, color: '#7A8E88', marginLeft: 6 }}>hoy</span>
+            </div>
+            <div>
+              <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 28, color: '#7A8E88' }}>
+                {Math.round(metrics.slice(-7).filter(m => m.hrv_ms).reduce((s, m) => s + m.hrv_ms, 0) / Math.max(1, metrics.slice(-7).filter(m => m.hrv_ms).length))}ms
+              </span>
+              <span style={{ fontSize: 12, color: '#7A8E88', marginLeft: 6 }}>promedio 7d</span>
+            </div>
           </div>
           <ResponsiveContainer width="100%" height={100}>
             <AreaChart data={hrvData}>
               <defs>
                 <linearGradient id="gHRV2" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#5BB8FF" stopOpacity={0.2}/>
-                  <stop offset="95%" stopColor="#5BB8FF" stopOpacity={0}/>
+                  <stop offset="5%" stopColor="#5BB8FF" stopOpacity={0.2} />
+                  <stop offset="95%" stopColor="#5BB8FF" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <XAxis dataKey="date" tick={{ fontSize: 9, fill: '#7A8E88' }} axisLine={false} tickLine={false} />
-              <YAxis hide domain={['auto','auto']} />
+              <YAxis hide domain={['auto', 'auto']} />
               <Tooltip contentStyle={{ background: '#0D1316', border: '1px solid rgba(91,184,255,0.2)', borderRadius: 8, fontSize: 11 }} />
               <Area type="monotone" dataKey="hrv" stroke="#5BB8FF" strokeWidth={2} fill="url(#gHRV2)" name="HRV ms" />
               <Line type="monotone" dataKey="baseline" stroke="#FFB347" strokeWidth={1} strokeDasharray="4 4" dot={false} name="Baseline" />
@@ -74,14 +85,14 @@ export default function Recovery() {
           </ResponsiveContainer>
         </div>
 
-        {/* Body battery */}
+        {/* Recovery factors */}
         <div style={{ background: '#0D1316', border: '1px solid rgba(0,229,160,0.1)', borderRadius: 10, padding: 20 }}>
           <div style={{ fontSize: 11, fontFamily: "'JetBrains Mono',monospace", color: '#7A8E88', letterSpacing: .5, marginBottom: 12 }}>FACTORES DE RECUPERACIÓN</div>
           {[
-            { label: 'SUEÑO', value: `${today.sleep_hours}h`, score: today.sleep_score, color: '#b088ff' },
-            { label: 'HRV', value: `${today.hrv_ms}ms`, score: Math.min(100, Math.round(today.hrv_ms * 1.5)), color: '#5BB8FF' },
-            { label: 'ESTRÉS', value: `${today.stress_score}`, score: 100 - today.stress_score, color: '#FFB347' },
-            { label: 'BODY BATTERY', value: `${today.body_battery}%`, score: today.body_battery, color: '#00E5A0' },
+            { label: 'SUEÑO', value: `${today.sleep_hours ?? '—'}h`, score: today.sleep_score ?? 0, color: '#b088ff' },
+            { label: 'HRV', value: `${today.hrv_ms ?? '—'}ms`, score: Math.min(100, Math.round((today.hrv_ms ?? 0) * 1.5)), color: '#5BB8FF' },
+            { label: 'ESTRÉS', value: `${today.stress_score ?? '—'}`, score: 100 - (today.stress_score ?? 50), color: '#FFB347' },
+            { label: 'BODY BATTERY', value: `${today.body_battery ?? '—'}%`, score: today.body_battery ?? 0, color: '#00E5A0' },
           ].map(f => (
             <div key={f.label} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
               <span style={{ fontSize: 10, fontFamily: "'JetBrains Mono',monospace", color: '#7A8E88', width: 90, letterSpacing: .5 }}>{f.label}</span>
@@ -98,10 +109,13 @@ export default function Recovery() {
         {/* Sleep stages */}
         <div style={{ background: '#0D1316', border: '1px solid rgba(0,229,160,0.1)', borderRadius: 10, padding: 20 }}>
           <div style={{ fontSize: 11, fontFamily: "'JetBrains Mono',monospace", color: '#7A8E88', letterSpacing: .5, marginBottom: 6 }}>FASES DE SUEÑO — ÚLTIMA NOCHE</div>
-          <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 32, color: '#b088ff', marginBottom: 16 }}>{today.sleep_hours}h <span style={{ fontSize: 16, color: '#7A8E88' }}>Score {today.sleep_score}</span></div>
+          <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 32, color: '#b088ff', marginBottom: 16 }}>
+            {today.sleep_hours ?? '—'}h{' '}
+            <span style={{ fontSize: 16, color: '#7A8E88' }}>Score {today.sleep_score ?? '—'}</span>
+          </div>
           <div style={{ display: 'flex', height: 12, borderRadius: 6, overflow: 'hidden', marginBottom: 16, gap: 2 }}>
             {sleepStages.map(s => (
-              <div key={s.name} style={{ flex: s.pct, background: s.color, opacity: .75 }} />
+              <div key={s.name} style={{ flex: s.pct, background: s.color, opacity: .75, minWidth: s.pct > 0 ? 2 : 0 }} />
             ))}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -116,14 +130,35 @@ export default function Recovery() {
           </div>
         </div>
 
-        {/* Recommendations */}
+        {/* AI recommendations */}
         <div style={{ background: '#0D1316', border: '1px solid rgba(0,229,160,0.15)', borderRadius: 10, padding: 20 }}>
           <div style={{ fontSize: 11, fontFamily: "'JetBrains Mono',monospace", color: '#00E5A0', letterSpacing: .5, marginBottom: 16 }}>// RECOMENDACIONES AI</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {[
-              { icon: '😴', title: 'Sueño', text: 'Tu sueño profundo está en 18% — dentro del rango óptimo (15-25%). Mantén horario consistente.', color: '#b088ff' },
-              { icon: '💧', title: 'Hidratación', text: 'Bebe 500ml extra hoy. Tu sudoración media en sesiones recientes fue alta.', color: '#5BB8FF' },
-              { icon: '🏃', title: 'Mañana', text: recovScore >= 70 ? 'Readiness alto — buena ventana para intensidad. Aprovecha la mañana.' : 'Readiness moderado — sesión de recuperación activa o descanso recomendado.', color: scoreColor },
+              {
+                icon: '😴',
+                title: 'Sueño',
+                text: today.sleep_deep_hours
+                  ? `Sueño profundo: ${today.sleep_deep_hours}h (${sleepStages[0].pct}%). ${sleepStages[0].pct >= 15 && sleepStages[0].pct <= 25 ? 'Dentro del rango óptimo (15–25%).' : 'Busca consistencia de horario para mejorarlo.'}`
+                  : 'Tu sueño profundo está en el rango normal. Mantén horario consistente.',
+                color: '#b088ff'
+              },
+              {
+                icon: '💧',
+                title: 'Hidratación',
+                text: 'Bebe 500ml extra hoy. Tu sudoración media en sesiones recientes fue alta.',
+                color: '#5BB8FF'
+              },
+              {
+                icon: '🏃',
+                title: 'Mañana',
+                text: recovScore >= 70
+                  ? 'Readiness alto — buena ventana para intensidad. Aprovecha la mañana.'
+                  : recovScore >= 50
+                  ? 'Readiness moderado — sesión de recuperación activa o ritmo suave recomendado.'
+                  : 'Readiness bajo — descanso completo o movilidad muy suave hoy.',
+                color: scoreColor
+              },
             ].map(r => (
               <div key={r.title} style={{ display: 'flex', gap: 12, padding: '12px 14px', background: '#111820', borderRadius: 8, borderLeft: `3px solid ${r.color}40` }}>
                 <span style={{ fontSize: 18, flexShrink: 0 }}>{r.icon}</span>

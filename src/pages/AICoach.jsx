@@ -3,21 +3,6 @@ import AppLayout from '../components/AppLayout'
 import { supabase, getDailyMetrics, getTrainingSessions } from '../lib/supabase'
 import { DEMO_METRICS, DEMO_SESSIONS, DEMO_TODAY, DEMO_USER } from '../lib/demoData'
 
-const SYSTEM_PROMPT = (athleteData) => `Eres un coach deportivo de élite con expertise en fisiología del rendimiento, periodización y recuperación. Tienes acceso a los datos reales del atleta desde su dispositivo Garmin.
-
-PERFIL DEL ATLETA:
-${JSON.stringify(athleteData, null, 2)}
-
-INSTRUCCIONES:
-- Responde siempre en español
-- Sé directo, específico y basado en datos
-- Cita métricas concretas del atleta en tus respuestas
-- Usa unidades correctas (ms para HRV, bpm para FC, km para distancia)
-- Mantén un tono profesional pero accesible
-- Si no tienes datos suficientes, indícalo claramente
-- Respuestas concisas (3-5 párrafos máximo)
-- Nunca des consejos médicos, solo de rendimiento deportivo`
-
 export default function AICoach() {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
@@ -41,8 +26,14 @@ export default function AICoach() {
         recent_metrics_14d: metrics,
         recent_sessions: sessions.slice(0, 5),
         weekly_tss: sessions.slice(0, 7).reduce((s, a) => s + (a.tss || 0), 0),
-        avg_hrv_7d: Math.round(metrics.slice(-7).reduce((s, m) => s + m.hrv_ms, 0) / 7),
-        avg_readiness_7d: Math.round(metrics.slice(-7).reduce((s, m) => s + m.readiness_score, 0) / 7),
+        avg_hrv_7d: Math.round(
+          metrics.slice(-7).reduce((s, m) => s + (m.hrv_ms || 0), 0) /
+          Math.max(1, metrics.slice(-7).filter(m => m.hrv_ms).length)
+        ),
+        avg_readiness_7d: Math.round(
+          metrics.slice(-7).reduce((s, m) => s + (m.readiness_score || 0), 0) /
+          Math.max(1, metrics.slice(-7).filter(m => m.readiness_score).length)
+        ),
       })
     }
     loadData()
@@ -61,22 +52,24 @@ export default function AICoach() {
     setLoading(true)
 
     try {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 1000,
-          system: SYSTEM_PROMPT(athleteData),
-          messages: newMessages
-        })
+      // Call the secure Edge Function proxy (never exposes API key to browser)
+      const { data, error } = await supabase.functions.invoke('ai-coach', {
+        body: { messages: newMessages, athleteData },
       })
 
-      const data = await response.json()
-      const assistantText = data.content?.find(b => b.type === 'text')?.text || 'Error al obtener respuesta.'
+      if (error) throw new Error(error.message || 'Error al contactar el coach')
+
+      const assistantText =
+        data?.content?.find(b => b.type === 'text')?.text ||
+        data?.error ||
+        'No se pudo obtener respuesta.'
+
       setMessages(prev => [...prev, { role: 'assistant', content: assistantText }])
     } catch (err) {
-      setMessages(prev => [...prev, { role: 'assistant', content: `Error de conexión: ${err.message}` }])
+      setMessages(prev => [
+        ...prev,
+        { role: 'assistant', content: `Error de conexión: ${err.message}` },
+      ])
     }
 
     setLoading(false)
@@ -97,7 +90,7 @@ export default function AICoach() {
           <h1 style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 32, letterSpacing: 1 }}>COACH IA PERSONALIZADO</h1>
           {athleteData && (
             <p style={{ fontSize: 13, color: '#7A8E88', marginTop: 4 }}>
-              Datos cargados: HRV hoy {athleteData.today_metrics.hrv_ms}ms · Readiness {athleteData.today_metrics.readiness_score} · TSS semanal {athleteData.weekly_tss}
+              Datos cargados: HRV hoy {athleteData.today_metrics?.hrv_ms ?? '—'}ms · Readiness {athleteData.today_metrics?.readiness_score ?? '—'} · TSS semanal {athleteData.weekly_tss}
             </p>
           )}
         </div>
