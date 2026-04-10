@@ -27,7 +27,7 @@ export default function Training() {
   }, [])
 
   // Build daily TSS from real session data
-  const sessionTssByDate: Record<string, number> = {}
+  const sessionTssByDate = {}
   sessions.forEach(s => {
     const d = (s.start_time || s.date || '').slice(0, 10)
     if (d) sessionTssByDate[d] = (sessionTssByDate[d] || 0) + (s.tss || 0)
