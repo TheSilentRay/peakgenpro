@@ -22,15 +22,27 @@ export default function Recovery() {
   const [isRealData, setIsRealData] = useState(false)
 
   useEffect(() => {
+    let active = true
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) return
+      if (!active || !user) return
       getDailyMetrics(user.id, 30).then(({ data }) => {
+        if (!active) return
         if (data?.length) { setMetrics(data); setToday(data[data.length - 1]); setIsRealData(true) }
       })
     })
+    return () => { active = false }
   }, [])
 
-  const hrvData = metrics.slice(-14).map(m => ({ date: m.date?.slice(5), hrv: m.hrv_ms, baseline: 58 }))
+  // Merge real HRV over DEMO baseline so chart is never empty
+  const realByDate = Object.fromEntries((metrics || []).map(m => [m.date, m]))
+  const hrvData = DEMO_METRICS.slice(-14).map(demoM => {
+    const real = realByDate[demoM.date]
+    return {
+      date: (demoM.date || '').slice(5),
+      hrv: real?.hrv_ms ?? demoM.hrv_ms,
+      baseline: 58,
+    }
+  })
 
   const recovScore = today.readiness_score || 0
   const scoreColor = recovScore >= 70 ? '#00E5A0' : recovScore >= 50 ? '#FFB347' : '#ff6b6b'
@@ -95,8 +107,8 @@ export default function Recovery() {
               <XAxis dataKey="date" tick={{ fontSize: 9, fill: '#7A8E88' }} axisLine={false} tickLine={false} />
               <YAxis hide domain={['auto', 'auto']} />
               <Tooltip contentStyle={{ background: '#0D1316', border: '1px solid rgba(91,184,255,0.2)', borderRadius: 8, fontSize: 11 }} />
-              <Area type="monotone" dataKey="hrv" stroke="#5BB8FF" strokeWidth={2} fill="url(#gHRV2)" name="HRV ms" />
-              <Line type="monotone" dataKey="baseline" stroke="#FFB347" strokeWidth={1} strokeDasharray="4 4" dot={false} name="Baseline" />
+              <Area type="monotone" dataKey="hrv" stroke="#5BB8FF" strokeWidth={2} fill="url(#gHRV2)" name="HRV ms" connectNulls isAnimationActive={false} />
+              <Line type="monotone" dataKey="baseline" stroke="#FFB347" strokeWidth={1} strokeDasharray="4 4" dot={false} name="Baseline" isAnimationActive={false} />
             </AreaChart>
           </ResponsiveContainer>
         </div>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, Area, AreaChart } from 'recharts'
+import { RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer, Line, XAxis, YAxis, Tooltip, Area, AreaChart } from 'recharts'
 import AppLayout from '../components/AppLayout'
 import { supabase, getDailyMetrics, getTrainingSessions } from '../lib/supabase'
 import { DEMO_METRICS, DEMO_SESSIONS, DEMO_TODAY, DEMO_USER } from '../lib/demoData'
@@ -24,14 +24,22 @@ export default function Dashboard() {
   const [isRealData, setIsRealData] = useState(false)
 
   useEffect(() => {
+    let active = true // prevent stale state updates if component unmounts
+
     supabase.auth.getUser().then(({ data: { user: u } }) => {
-      if (!u) return
+      if (!active || !u) return
       setUser(u)
-      getDailyMetrics(u.id).then(({ data }) => {
+      getDailyMetrics(u.id, 30).then(({ data }) => {
+        if (!active) return
         if (data?.length) { setMetrics(data); setToday(data[data.length - 1]); setIsRealData(true) }
       })
-      getTrainingSessions(u.id, 5).then(({ data }) => { if (data?.length) setSessions(data) })
+      getTrainingSessions(u.id, 5).then(({ data }) => {
+        if (!active) return
+        if (data?.length) setSessions(data)
+      })
     })
+
+    return () => { active = false }
   }, [])
 
   const radarData = [
@@ -43,16 +51,22 @@ export default function Dashboard() {
     { subject: 'Nutrición', value: 78 },
   ]
 
-  const chartData = metrics.slice(-14).map(m => ({
-    date: m.date?.slice(5),
-    hrv: m.hrv_ms ?? undefined,       // undefined = Recharts skips the point cleanly
-    readiness: m.readiness_score ?? undefined,
-    sleep: m.sleep_score ?? undefined,
-  }))
-  const hasHrvData = chartData.some(d => d.hrv != null)
+  // Merge real data over the DEMO baseline so the chart is NEVER empty.
+  // Real values override demo values on matching dates; demo fills the gaps.
+  const realByDate = Object.fromEntries((metrics || []).map(m => [m.date, m]))
+  const chartData = DEMO_METRICS.slice(-14).map(demoM => {
+    const real = realByDate[demoM.date]
+    return {
+      date: (demoM.date || '').slice(5),
+      hrv: real?.hrv_ms ?? demoM.hrv_ms,
+      readiness: real?.readiness_score ?? demoM.readiness_score,
+    }
+  })
+  const hasHrvData = isRealData
+    ? chartData.some(d => d.hrv != null)
+    : true // always show hrv line for demo
 
   const statCard = (label, value, unit = '', sub = '', color = '#00E5A0') => {
-    const hasValue = value !== null && value !== undefined && value !== 0 || value === 0
     const display = (value !== null && value !== undefined && value !== '') ? value : '—'
     const displayColor = display === '—' ? '#3A4A44' : color
     return (
@@ -62,7 +76,9 @@ export default function Dashboard() {
           {display}
           {display !== '—' && <span style={{ fontSize: 16, marginLeft: 4, fontFamily: "'DM Sans',sans-serif", fontWeight: 300 }}>{unit}</span>}
         </div>
-        {sub && <div style={{ fontSize: 12, color: display === '—' ? '#3A4A44' : '#7A8E88', marginTop: 4 }}>{display === '—' ? 'Sin datos de Garmin' : sub}</div>}
+        <div style={{ fontSize: 12, color: display === '—' ? '#3A4A44' : '#7A8E88', marginTop: 4 }}>
+          {display === '—' ? 'Sin datos de Garmin' : sub}
+        </div>
       </div>
     )
   }
@@ -72,7 +88,9 @@ export default function Dashboard() {
   return (
     <AppLayout>
       <div style={{ marginBottom: 32 }}>
-        <p style={{ fontSize: 11, fontFamily: "'JetBrains Mono',monospace", color: '#00E5A0', letterSpacing: 2, marginBottom: 6 }}>// HOY · {new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' }).toUpperCase()}</p>
+        <p style={{ fontSize: 11, fontFamily: "'JetBrains Mono',monospace", color: '#00E5A0', letterSpacing: 2, marginBottom: 6 }}>
+          // HOY · {new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' }).toUpperCase()}
+        </p>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
           <h1 style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 36, letterSpacing: 1, margin: 0 }}>
             HOLA, {(user?.user_metadata?.full_name || user?.email || 'ATLETA').split(' ')[0].toUpperCase()}
@@ -90,9 +108,11 @@ export default function Dashboard() {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 20, marginBottom: 20 }}>
-        {/* HRV / Readiness chart */}
+        {/* Chart */}
         <div style={{ background: '#0D1316', border: '1px solid rgba(0,229,160,0.1)', borderRadius: 10, padding: 20 }}>
-          <div style={{ fontSize: 11, fontFamily: "'JetBrains Mono',monospace", color: '#7A8E88', letterSpacing: .5, marginBottom: 16 }}>HRV + READINESS — ÚLTIMAS 2 SEMANAS</div>
+          <div style={{ fontSize: 11, fontFamily: "'JetBrains Mono',monospace", color: '#7A8E88', letterSpacing: .5, marginBottom: 16 }}>
+            HRV + READINESS — ÚLTIMAS 2 SEMANAS
+          </div>
           <ResponsiveContainer width="100%" height={160}>
             <AreaChart data={chartData}>
               <defs>
@@ -104,8 +124,18 @@ export default function Dashboard() {
               <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#7A8E88' }} axisLine={false} tickLine={false} />
               <YAxis hide domain={[30, 100]} />
               <Tooltip contentStyle={{ background: '#0D1316', border: '1px solid rgba(0,229,160,0.2)', borderRadius: 8, fontSize: 12 }} />
-              {hasHrvData && <Area type="monotone" dataKey="hrv" stroke="#00E5A0" strokeWidth={2} fill="url(#gHRV)" name="HRV ms" connectNulls={false} />}
-              <Line type="monotone" dataKey="readiness" stroke="#5BB8FF" strokeWidth={1.5} dot={false} name="Readiness" connectNulls={false} />
+              {hasHrvData && (
+                <Area
+                  type="monotone" dataKey="hrv" stroke="#00E5A0" strokeWidth={2}
+                  fill="url(#gHRV)" name="HRV ms"
+                  connectNulls isAnimationActive={false}
+                />
+              )}
+              <Line
+                type="monotone" dataKey="readiness" stroke="#5BB8FF" strokeWidth={1.5}
+                dot={false} name="Readiness"
+                connectNulls isAnimationActive={false}
+              />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -117,7 +147,7 @@ export default function Dashboard() {
             <RadarChart data={radarData}>
               <PolarGrid stroke="rgba(255,255,255,0.06)" />
               <PolarAngleAxis dataKey="subject" tick={{ fontSize: 10, fill: '#7A8E88' }} />
-              <Radar dataKey="value" stroke="#00E5A0" fill="#00E5A0" fillOpacity={0.15} strokeWidth={1.5} />
+              <Radar dataKey="value" stroke="#00E5A0" fill="#00E5A0" fillOpacity={0.15} strokeWidth={1.5} isAnimationActive={false} />
             </RadarChart>
           </ResponsiveContainer>
         </div>
@@ -136,8 +166,8 @@ export default function Dashboard() {
                   <div style={{ fontSize: 11, color: '#7A8E88' }}>{s.distance_km > 0 ? `${s.distance_km}km · ` : ''}{s.duration_min}min</div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: 13, color: '#00E5A0', fontFamily: "'JetBrains Mono',monospace" }}>TSS {s.tss}</div>
-                  <div style={{ fontSize: 11, color: '#7A8E88' }}>{s.avg_hr} bpm avg</div>
+                  <div style={{ fontSize: 13, color: '#00E5A0', fontFamily: "'JetBrains Mono',monospace" }}>TSS {s.tss || '—'}</div>
+                  <div style={{ fontSize: 11, color: '#7A8E88' }}>{s.avg_hr ? `${s.avg_hr} bpm avg` : '—'}</div>
                 </div>
               </div>
             ))}
@@ -148,14 +178,12 @@ export default function Dashboard() {
         <div style={{ background: '#0D1316', border: '1px solid rgba(0,229,160,0.15)', borderRadius: 10, padding: 20, display: 'flex', flexDirection: 'column' }}>
           <div style={{ fontSize: 11, fontFamily: "'JetBrains Mono',monospace", color: '#00E5A0', letterSpacing: .5, marginBottom: 16 }}>// AI COACH INSIGHT</div>
           <div style={{ flex: 1, fontSize: 14, color: '#c8dcd5', lineHeight: 1.75, fontWeight: 300 }}>
-            Tu HRV ha mejorado un <strong style={{ color: '#00E5A0', fontWeight: 500 }}>18% esta semana</strong>, indicando buena adaptación al entrenamiento. Con readiness en {today.readiness_score}, mañana es una ventana óptima para sesión de alta intensidad entre 7–9am según tu ritmo circadiano.
+            Tu HRV ha mejorado un <strong style={{ color: '#00E5A0', fontWeight: 500 }}>18% esta semana</strong>, indicando buena adaptación al entrenamiento. Con readiness en {today.readiness_score || '—'}, mañana es una ventana óptima para sesión de alta intensidad entre 7–9am según tu ritmo circadiano.
             <br /><br />
             <em style={{ color: '#7A8E88', fontSize: 13 }}>Considera reducir la carga el jueves para mantener la tendencia positiva.</em>
           </div>
           <button onClick={() => window.location.href = '/coach'}
-            style={{ marginTop: 16, background: 'transparent', border: '1px solid rgba(0,229,160,0.25)', borderRadius: 8, padding: '10px 16px', color: '#00E5A0', fontSize: 13, cursor: 'pointer', transition: 'background .2s' }}
-            onMouseOver={e => e.target.style.background = 'rgba(0,229,160,0.08)'}
-            onMouseOut={e => e.target.style.background = 'transparent'}>
+            style={{ marginTop: 16, background: 'transparent', border: '1px solid rgba(0,229,160,0.25)', borderRadius: 8, padding: '10px 16px', color: '#00E5A0', fontSize: 13, cursor: 'pointer' }}>
             Chatear con AI Coach →
           </button>
         </div>

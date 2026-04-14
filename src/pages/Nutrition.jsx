@@ -22,15 +22,19 @@ export default function Nutrition() {
   const n = DEMO_NUTRITION // meals are always demo — Garmin doesn't sync food logs
 
   useEffect(() => {
+    let active = true
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) return
+      if (!active || !user) return
       getDailyMetrics(user.id, 1).then(({ data }) => {
+        if (!active) return
         if (data?.length) { setToday(data[data.length - 1]); setIsRealData(true) }
       })
       getTrainingSessions(user.id, 5).then(({ data }) => {
+        if (!active) return
         if (data?.length) setRecentSessions(data)
       })
     })
+    return () => { active = false }
   }, [])
 
   // Real calories burned today from Garmin (active + session calories)

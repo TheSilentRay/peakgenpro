@@ -32,13 +32,19 @@ export default function Training() {
   const [isRealData, setIsRealData] = useState(false)
 
   useEffect(() => {
+    let active = true
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) return
+      if (!active || !user) return
       getTrainingSessions(user.id).then(({ data }) => {
+        if (!active) return
         if (data?.length) { setSessions(data); setIsRealData(true) }
       })
-      getDailyMetrics(user.id, 8).then(({ data }) => { if (data?.length) setMetrics(data) })
+      getDailyMetrics(user.id, 8).then(({ data }) => {
+        if (!active) return
+        if (data?.length) setMetrics(data)
+      })
     })
+    return () => { active = false }
   }, [])
 
   // Build daily TSS from real session data
@@ -48,13 +54,17 @@ export default function Training() {
     if (d) sessionTssByDate[d] = (sessionTssByDate[d] || 0) + (s.tss || 0)
   })
 
-  const weeklyLoad = metrics.slice(-8).map((m, i) => {
-    const date = m.date || ''
+  // Merge real metrics over DEMO baseline so chart always has data
+  const realMetricsByDate = Object.fromEntries((metrics || []).map(m => [m.date, m]))
+  const weeklyLoad = DEMO_METRICS.slice(-8).map((demoM, i) => {
+    const real = realMetricsByDate[demoM.date]
+    const date = demoM.date || ''
     const dayIndex = date ? new Date(date + 'T12:00:00').getDay() : i
+    const tss = sessionTssByDate[date]
     return {
       day: DAYS_ES[dayIndex],
-      tss: sessionTssByDate[date] || 0,
-      readiness: m.readiness_score || 0,
+      tss: tss !== undefined ? tss : (real?.tss ?? 0),
+      readiness: real?.readiness_score ?? demoM.readiness_score ?? 0,
     }
   })
 
@@ -85,7 +95,7 @@ export default function Training() {
             <XAxis dataKey="day" tick={{ fontSize: 11, fill: '#7A8E88' }} axisLine={false} tickLine={false} />
             <YAxis hide />
             <Tooltip contentStyle={{ background: '#0D1316', border: '1px solid rgba(0,229,160,0.2)', borderRadius: 8, fontSize: 12 }} />
-            <Bar dataKey="tss" fill="#00E5A0" fillOpacity={0.7} radius={[4, 4, 0, 0]} name="TSS" />
+            <Bar dataKey="tss" fill="#00E5A0" fillOpacity={0.7} radius={[4, 4, 0, 0]} name="TSS" isAnimationActive={false} />
           </BarChart>
         </ResponsiveContainer>
       </div>
