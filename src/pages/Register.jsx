@@ -5,7 +5,7 @@ import { signUp } from '../lib/supabase'
 const STEPS = ['Cuenta', 'Deporte', 'Cuerpo', 'Objetivos']
 
 const SPORTS = ['Triatlón', 'Running', 'Ciclismo', 'Natación', 'CrossFit', 'Fútbol', 'Tenis', 'Otro']
-const GOALS = ['Mejorar rendimiento', 'Perder peso', 'Ganar masa muscular', 'Reducir lesiones', 'Preparar competición', 'Salud general']
+const GOALS = ['Mejorar rendimiento', 'Perder peso', 'Ganar masa muscular', 'Reducir lesiones', 'Preparar competición', 'Salud general', 'Otro']
 
 export default function Register() {
   const navigate = useNavigate()
@@ -14,9 +14,9 @@ export default function Register() {
   const [error, setError] = useState('')
   const [form, setForm] = useState({
     email: '', password: '',
-    sport: '', level: 'intermedio',
+    sport: '', sportCustom: '', level: 'intermedio',
     age: '', weight: '', height: '',
-    goal: '', sessions_per_week: '4'
+    goal: '', goalCustom: '', sessions_per_week: '4'
   })
 
   const update = (k, v) => setForm(f => ({ ...f, [k]: v }))
@@ -27,10 +27,12 @@ export default function Register() {
   const handleSubmit = async () => {
     setLoading(true)
     setError('')
+    const sportValue = form.sport === 'Otro' ? (form.sportCustom.trim() || 'Otro') : form.sport
+    const goalValue = form.goal === 'Otro' ? (form.goalCustom.trim() || 'Otro') : form.goal
     const { error } = await signUp(form.email, form.password, {
-      sport: form.sport, level: form.level, age: form.age,
+      sport: sportValue, level: form.level, age: form.age,
       weight_kg: form.weight, height_cm: form.height,
-      goal: form.goal, sessions_per_week: form.sessions_per_week
+      goal: goalValue, sessions_per_week: form.sessions_per_week
     })
     setLoading(false)
     if (error) { setError(error.message); return }
@@ -105,6 +107,16 @@ export default function Register() {
                     </button>
                   ))}
                 </div>
+                {form.sport === 'Otro' && (
+                  <input
+                    type="text"
+                    placeholder="Escribe tu deporte..."
+                    value={form.sportCustom}
+                    onChange={e => update('sportCustom', e.target.value)}
+                    autoFocus
+                    style={{ ...inputStyle, marginTop: 10 }}
+                  />
+                )}
               </div>
               <div>
                 <label style={labelStyle}>NIVEL</label>
@@ -118,8 +130,8 @@ export default function Register() {
               </div>
               <div style={{ display: 'flex', gap: 10 }}>
                 <button onClick={back} style={{ flex: 1, padding: 12, background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, color: '#7A8E88', cursor: 'pointer' }}>← Atrás</button>
-                <button onClick={next} disabled={!form.sport}
-                  style={{ flex: 2, background: '#00E5A0', color: '#060a08', fontWeight: 500, fontSize: 15, padding: 12, border: 'none', borderRadius: 8, cursor: 'pointer', opacity: !form.sport ? .5 : 1 }}>
+                <button onClick={next} disabled={!form.sport || (form.sport === 'Otro' && !form.sportCustom.trim())}
+                  style={{ flex: 2, background: '#00E5A0', color: '#060a08', fontWeight: 500, fontSize: 15, padding: 12, border: 'none', borderRadius: 8, cursor: 'pointer', opacity: (!form.sport || (form.sport === 'Otro' && !form.sportCustom.trim())) ? .5 : 1 }}>
                   Continuar →
                 </button>
               </div>
@@ -162,6 +174,16 @@ export default function Register() {
                     </button>
                   ))}
                 </div>
+                {form.goal === 'Otro' && (
+                  <input
+                    type="text"
+                    placeholder="Escribe tu objetivo..."
+                    value={form.goalCustom}
+                    onChange={e => update('goalCustom', e.target.value)}
+                    autoFocus
+                    style={{ ...inputStyle, marginTop: 6 }}
+                  />
+                )}
               </div>
               <div>
                 <label style={labelStyle}>SESIONES POR SEMANA</label>
@@ -172,8 +194,8 @@ export default function Register() {
               </div>
               <div style={{ display: 'flex', gap: 10 }}>
                 <button onClick={back} style={{ flex: 1, padding: 12, background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, color: '#7A8E88', cursor: 'pointer' }}>← Atrás</button>
-                <button onClick={handleSubmit} disabled={!form.goal || loading}
-                  style={{ flex: 2, background: '#00E5A0', color: '#060a08', fontWeight: 500, fontSize: 15, padding: 12, border: 'none', borderRadius: 8, cursor: 'pointer', opacity: (!form.goal || loading) ? .6 : 1 }}>
+                <button onClick={handleSubmit} disabled={!form.goal || (form.goal === 'Otro' && !form.goalCustom.trim()) || loading}
+                  style={{ flex: 2, background: '#00E5A0', color: '#060a08', fontWeight: 500, fontSize: 15, padding: 12, border: 'none', borderRadius: 8, cursor: 'pointer', opacity: (!form.goal || (form.goal === 'Otro' && !form.goalCustom.trim()) || loading) ? .6 : 1 }}>
                   {loading ? 'Creando cuenta...' : 'Crear cuenta →'}
                 </button>
               </div>

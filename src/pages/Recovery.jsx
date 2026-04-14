@@ -4,15 +4,28 @@ import AppLayout from '../components/AppLayout'
 import { supabase, getDailyMetrics } from '../lib/supabase'
 import { DEMO_METRICS, DEMO_TODAY } from '../lib/demoData'
 
+const DataBadge = ({ isReal }) => (
+  <span style={{
+    fontSize: 10, fontFamily: "'JetBrains Mono',monospace", letterSpacing: 1,
+    padding: '3px 8px', borderRadius: 4,
+    background: isReal ? 'rgba(0,229,160,0.1)' : 'rgba(255,179,71,0.1)',
+    color: isReal ? '#00E5A0' : '#FFB347',
+    border: `1px solid ${isReal ? 'rgba(0,229,160,0.25)' : 'rgba(255,179,71,0.25)'}`,
+  }}>
+    {isReal ? '✓ DATOS REALES' : '⚠ DATOS DEMO'}
+  </span>
+)
+
 export default function Recovery() {
   const [metrics, setMetrics] = useState(DEMO_METRICS)
   const [today, setToday] = useState(DEMO_TODAY)
+  const [isRealData, setIsRealData] = useState(false)
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) return
       getDailyMetrics(user.id, 30).then(({ data }) => {
-        if (data?.length) { setMetrics(data); setToday(data[data.length - 1]) }
+        if (data?.length) { setMetrics(data); setToday(data[data.length - 1]); setIsRealData(true) }
       })
     })
   }, [])
@@ -42,7 +55,10 @@ export default function Recovery() {
     <AppLayout>
       <div style={{ marginBottom: 28 }}>
         <p style={{ fontSize: 11, fontFamily: "'JetBrains Mono',monospace", color: '#00E5A0', letterSpacing: 2, marginBottom: 4 }}>// RECUPERACIÓN</p>
-        <h1 style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 32, letterSpacing: 1 }}>RECOVERY SCORE</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <h1 style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 32, letterSpacing: 1, margin: 0 }}>RECOVERY SCORE</h1>
+          <DataBadge isReal={isRealData} />
+        </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr 1fr', gap: 16, marginBottom: 20 }}>

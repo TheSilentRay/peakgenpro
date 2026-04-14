@@ -14,14 +14,29 @@ const ZONES = [
 
 const DAYS_ES = ['D', 'L', 'M', 'X', 'J', 'V', 'S'] // getDay() 0=Sun
 
+const DataBadge = ({ isReal }) => (
+  <span style={{
+    fontSize: 10, fontFamily: "'JetBrains Mono',monospace", letterSpacing: 1,
+    padding: '3px 8px', borderRadius: 4,
+    background: isReal ? 'rgba(0,229,160,0.1)' : 'rgba(255,179,71,0.1)',
+    color: isReal ? '#00E5A0' : '#FFB347',
+    border: `1px solid ${isReal ? 'rgba(0,229,160,0.25)' : 'rgba(255,179,71,0.25)'}`,
+  }}>
+    {isReal ? '✓ DATOS REALES' : '⚠ DATOS DEMO'}
+  </span>
+)
+
 export default function Training() {
   const [sessions, setSessions] = useState(DEMO_SESSIONS)
   const [metrics, setMetrics] = useState(DEMO_METRICS)
+  const [isRealData, setIsRealData] = useState(false)
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) return
-      getTrainingSessions(user.id).then(({ data }) => { if (data?.length) setSessions(data) })
+      getTrainingSessions(user.id).then(({ data }) => {
+        if (data?.length) { setSessions(data); setIsRealData(true) }
+      })
       getDailyMetrics(user.id, 8).then(({ data }) => { if (data?.length) setMetrics(data) })
     })
   }, [])
@@ -56,7 +71,10 @@ export default function Training() {
     <AppLayout>
       <div style={{ marginBottom: 28 }}>
         <p style={{ fontSize: 11, fontFamily: "'JetBrains Mono',monospace", color: '#00E5A0', letterSpacing: 2, marginBottom: 4 }}>// ENTRENAMIENTO</p>
-        <h1 style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 32, letterSpacing: 1 }}>TRAINING LOAD</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <h1 style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 32, letterSpacing: 1, margin: 0 }}>TRAINING LOAD</h1>
+          <DataBadge isReal={isRealData} />
+        </div>
       </div>
 
       {/* Weekly TSS chart */}

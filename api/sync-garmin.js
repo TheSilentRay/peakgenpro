@@ -111,7 +111,8 @@ module.exports = async function handler(req, res) {
 
     // ── 2. Body Battery ──────────────────────────────────────────────
     const bodyBatteryByDate = {}
-    const bbData = await safeCall(() => gc.getBodyBattery(startDate, today))
+    // garmin-connect expects a date-range array: [startDate, endDate]
+    const bbData = await safeCall(() => gc.getBodyBattery([startDate, today]))
     if (Array.isArray(bbData)) {
       for (const entry of bbData) {
         const ts = entry.startTimestampLocal ?? entry.startTimestampGMT
@@ -149,11 +150,10 @@ module.exports = async function handler(req, res) {
         rawData.sleep = sleepData
       }
 
-      // Daily summary
-      const summary =
-        await safeCall(() => gcAny.getDailyHealthStats?.(date)) ??
-        await safeCall(() => gcAny.getUserSummary?.(date)) ??
-        await safeCall(() => gcAny.getDailySummary?.(date))
+      // Daily summary — try each method in order until one succeeds
+      let summary = await safeCall(() => gcAny.getDailySummary?.(date))
+      if (!summary) summary = await safeCall(() => gcAny.getUserSummary?.(date))
+      if (!summary) summary = await safeCall(() => gcAny.getDailyHealthStats?.(date))
       if (summary) {
         steps = summary.totalSteps ?? null
         caloriesActive = summary.activeKilocalories ?? null
@@ -171,9 +171,8 @@ module.exports = async function handler(req, res) {
       }
 
       // HRV
-      const hrvData =
-        await safeCall(() => gcAny.getHrv?.(date)) ??
-        await safeCall(() => gcAny.getHRV?.(date))
+      let hrvData = await safeCall(() => gcAny.getHrv?.(date))
+      if (!hrvData) hrvData = await safeCall(() => gcAny.getHRV?.(date))
       if (hrvData?.hrvSummary) {
         hrvMs = hrvData.hrvSummary.lastNight ?? hrvData.hrvSummary.weeklyAvg ?? null
         rawData.hrv = hrvData

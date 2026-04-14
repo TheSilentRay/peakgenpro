@@ -4,17 +4,32 @@ import AppLayout from '../components/AppLayout'
 import { supabase, getDailyMetrics, getTrainingSessions } from '../lib/supabase'
 import { DEMO_METRICS, DEMO_SESSIONS, DEMO_TODAY, DEMO_USER } from '../lib/demoData'
 
+const DataBadge = ({ isReal }) => (
+  <span style={{
+    fontSize: 10, fontFamily: "'JetBrains Mono',monospace", letterSpacing: 1,
+    padding: '3px 8px', borderRadius: 4,
+    background: isReal ? 'rgba(0,229,160,0.1)' : 'rgba(255,179,71,0.1)',
+    color: isReal ? '#00E5A0' : '#FFB347',
+    border: `1px solid ${isReal ? 'rgba(0,229,160,0.25)' : 'rgba(255,179,71,0.25)'}`,
+  }}>
+    {isReal ? '✓ DATOS REALES' : '⚠ DATOS DEMO'}
+  </span>
+)
+
 export default function Dashboard() {
   const [metrics, setMetrics] = useState(DEMO_METRICS)
   const [sessions, setSessions] = useState(DEMO_SESSIONS)
   const [today, setToday] = useState(DEMO_TODAY)
   const [user, setUser] = useState(DEMO_USER)
+  const [isRealData, setIsRealData] = useState(false)
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user: u } }) => {
       if (!u) return
       setUser(u)
-      getDailyMetrics(u.id).then(({ data }) => { if (data?.length) { setMetrics(data); setToday(data[data.length - 1]) } })
+      getDailyMetrics(u.id).then(({ data }) => {
+        if (data?.length) { setMetrics(data); setToday(data[data.length - 1]); setIsRealData(true) }
+      })
       getTrainingSessions(u.id, 5).then(({ data }) => { if (data?.length) setSessions(data) })
     })
   }, [])
@@ -49,9 +64,12 @@ export default function Dashboard() {
     <AppLayout>
       <div style={{ marginBottom: 32 }}>
         <p style={{ fontSize: 11, fontFamily: "'JetBrains Mono',monospace", color: '#00E5A0', letterSpacing: 2, marginBottom: 6 }}>// HOY · {new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' }).toUpperCase()}</p>
-        <h1 style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 36, letterSpacing: 1 }}>
-          HOLA, {(user?.user_metadata?.full_name || user?.email || 'ATLETA').split(' ')[0].toUpperCase()}
-        </h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+          <h1 style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 36, letterSpacing: 1, margin: 0 }}>
+            HOLA, {(user?.user_metadata?.full_name || user?.email || 'ATLETA').split(' ')[0].toUpperCase()}
+          </h1>
+          <DataBadge isReal={isRealData} />
+        </div>
       </div>
 
       {/* KPI row */}
