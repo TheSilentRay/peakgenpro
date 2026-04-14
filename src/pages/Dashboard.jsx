@@ -35,28 +35,37 @@ export default function Dashboard() {
   }, [])
 
   const radarData = [
-    { subject: 'Aeróbico', value: Math.round(today.readiness_score * 0.9) },
+    { subject: 'Aeróbico', value: Math.round((today.readiness_score || 50) * 0.9) },
     { subject: 'Fuerza', value: 71 },
-    { subject: 'Recovery', value: Math.round(today.readiness_score) },
-    { subject: 'Sueño', value: today.sleep_score },
-    { subject: 'HRV', value: Math.min(100, Math.round(today.hrv_ms * 1.4)) },
+    { subject: 'Recovery', value: today.readiness_score || 50 },
+    { subject: 'Sueño', value: today.sleep_score || 50 },
+    { subject: 'HRV', value: today.hrv_ms ? Math.min(100, Math.round(today.hrv_ms * 1.4)) : 50 },
     { subject: 'Nutrición', value: 78 },
   ]
 
   const chartData = metrics.slice(-14).map(m => ({
     date: m.date?.slice(5),
-    hrv: m.hrv_ms,
-    readiness: m.readiness_score,
-    sleep: m.sleep_score
+    hrv: m.hrv_ms ?? undefined,       // undefined = Recharts skips the point cleanly
+    readiness: m.readiness_score ?? undefined,
+    sleep: m.sleep_score ?? undefined,
   }))
+  const hasHrvData = chartData.some(d => d.hrv != null)
 
-  const statCard = (label, value, unit = '', sub = '', color = '#00E5A0') => (
-    <div style={{ background: '#0D1316', border: '1px solid rgba(0,229,160,0.1)', borderRadius: 10, padding: '18px 20px' }}>
-      <div style={{ fontSize: 11, fontFamily: "'JetBrains Mono',monospace", color: '#7A8E88', letterSpacing: .5, marginBottom: 8 }}>{label}</div>
-      <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 36, letterSpacing: 1, color }}>{value}<span style={{ fontSize: 16, marginLeft: 4, fontFamily: "'DM Sans',sans-serif", fontWeight: 300 }}>{unit}</span></div>
-      {sub && <div style={{ fontSize: 12, color: '#7A8E88', marginTop: 4 }}>{sub}</div>}
-    </div>
-  )
+  const statCard = (label, value, unit = '', sub = '', color = '#00E5A0') => {
+    const hasValue = value !== null && value !== undefined && value !== 0 || value === 0
+    const display = (value !== null && value !== undefined && value !== '') ? value : '—'
+    const displayColor = display === '—' ? '#3A4A44' : color
+    return (
+      <div style={{ background: '#0D1316', border: '1px solid rgba(0,229,160,0.1)', borderRadius: 10, padding: '18px 20px' }}>
+        <div style={{ fontSize: 11, fontFamily: "'JetBrains Mono',monospace", color: '#7A8E88', letterSpacing: .5, marginBottom: 8 }}>{label}</div>
+        <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 36, letterSpacing: 1, color: displayColor }}>
+          {display}
+          {display !== '—' && <span style={{ fontSize: 16, marginLeft: 4, fontFamily: "'DM Sans',sans-serif", fontWeight: 300 }}>{unit}</span>}
+        </div>
+        {sub && <div style={{ fontSize: 12, color: display === '—' ? '#3A4A44' : '#7A8E88', marginTop: 4 }}>{display === '—' ? 'Sin datos de Garmin' : sub}</div>}
+      </div>
+    )
+  }
 
   const activityIcon = t => ({ running: '🏃', cycling: '🚴', swimming: '🏊', strength: '💪', triathlon: '⚡' }[t] || '⚡')
 
@@ -95,8 +104,8 @@ export default function Dashboard() {
               <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#7A8E88' }} axisLine={false} tickLine={false} />
               <YAxis hide domain={[30, 100]} />
               <Tooltip contentStyle={{ background: '#0D1316', border: '1px solid rgba(0,229,160,0.2)', borderRadius: 8, fontSize: 12 }} />
-              <Area type="monotone" dataKey="hrv" stroke="#00E5A0" strokeWidth={2} fill="url(#gHRV)" name="HRV ms" />
-              <Line type="monotone" dataKey="readiness" stroke="#5BB8FF" strokeWidth={1.5} dot={false} name="Readiness" />
+              {hasHrvData && <Area type="monotone" dataKey="hrv" stroke="#00E5A0" strokeWidth={2} fill="url(#gHRV)" name="HRV ms" connectNulls={false} />}
+              <Line type="monotone" dataKey="readiness" stroke="#5BB8FF" strokeWidth={1.5} dot={false} name="Readiness" connectNulls={false} />
             </AreaChart>
           </ResponsiveContainer>
         </div>

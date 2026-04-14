@@ -1,5 +1,5 @@
 // api/ai-coach.js — Vercel serverless (Node.js)
-// Secure proxy for Anthropic API — never exposes the key to the browser
+// Secure proxy for Google Gemini API — never exposes the key to the browser
 
 const { createClient } = require('@supabase/supabase-js')
 
@@ -30,9 +30,9 @@ module.exports = async function handler(req, res) {
   try {
     const { messages, athleteData } = req.body
 
-    const anthropicKey = process.env.ANTHROPIC_API_KEY
-    if (!anthropicKey) {
-      throw new Error('ANTHROPIC_API_KEY no configurada en las variables de entorno de Vercel')
+    const geminiKey = process.env.GEMINI_API_KEY
+    if (!geminiKey) {
+      throw new Error('GEMINI_API_KEY no configurada en las variables de entorno de Vercel')
     }
 
     const systemPrompt = `Eres un coach deportivo de élite con expertise en fisiología del rendimiento, periodización y recuperación. Tienes acceso a los datos reales del atleta desde su dispositivo Garmin.
@@ -50,27 +50,38 @@ INSTRUCCIONES:
 - Respuestas concisas (3-5 párrafos máximo)
 - Nunca des consejos médicos, solo de rendimiento deportivo`
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': anthropicKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1000,
-        system: systemPrompt,
-        messages,
-      }),
-    })
+    // Convert messages from Anthropic format {role, content} to Gemini format {role, parts}
+    // Gemini uses 'model' instead of 'assistant'
+    const geminiMessages = messages.map(m => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: m.content }],
+    }))
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: systemPrompt }] },
+          contents: geminiMessages,
+          generationConfig: {
+            maxOutputTokens: 1000,
+            temperature: 0.7,
+          },
+        }),
+      }
+    )
 
     const data = await response.json()
     if (!response.ok) {
-      throw new Error(data.error?.message ?? `Anthropic API error ${response.status}`)
+      const errMsg = data.error?.message ?? `Gemini API error ${response.status}`
+      throw new Error(errMsg)
     }
 
-    return res.status(200).json(data)
+    // Normalize to a simple { text } response the frontend can read
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? 'No se pudo obtener respuesta.'
+    return res.status(200).json({ text })
 
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error)
