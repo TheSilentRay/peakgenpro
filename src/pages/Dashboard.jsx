@@ -4,6 +4,9 @@ import AppLayout from '../components/AppLayout'
 import { supabase, getDailyMetrics, getTrainingSessions } from '../lib/supabase'
 import { DEMO_METRICS, DEMO_SESSIONS, DEMO_TODAY, DEMO_USER } from '../lib/demoData'
 
+// Module-level cache — survives navigation (component unmount/remount)
+const _cache = { metrics: null, sessions: null, today: null, user: null }
+
 const DataBadge = ({ isReal }) => (
   <span style={{
     fontSize: 10, fontFamily: "'JetBrains Mono',monospace", letterSpacing: 1,
@@ -17,25 +20,34 @@ const DataBadge = ({ isReal }) => (
 )
 
 export default function Dashboard() {
-  const [metrics, setMetrics] = useState(DEMO_METRICS)
-  const [sessions, setSessions] = useState(DEMO_SESSIONS)
-  const [today, setToday] = useState(DEMO_TODAY)
-  const [user, setUser] = useState(DEMO_USER)
-  const [isRealData, setIsRealData] = useState(false)
+  const [metrics, setMetrics] = useState(_cache.metrics || DEMO_METRICS)
+  const [sessions, setSessions] = useState(_cache.sessions || DEMO_SESSIONS)
+  const [today, setToday] = useState(_cache.today || DEMO_TODAY)
+  const [user, setUser] = useState(_cache.user || DEMO_USER)
+  const [isRealData, setIsRealData] = useState(!!_cache.metrics)
 
   useEffect(() => {
-    let active = true // prevent stale state updates if component unmounts
+    // Skip fetch if cache already has real data
+    if (_cache.metrics) return
+    let active = true
 
     supabase.auth.getUser().then(({ data: { user: u } }) => {
       if (!active || !u) return
+      _cache.user = u
       setUser(u)
       getDailyMetrics(u.id, 30).then(({ data }) => {
         if (!active) return
-        if (data?.length) { setMetrics(data); setToday(data[data.length - 1]); setIsRealData(true) }
+        if (data?.length) {
+          _cache.metrics = data
+          _cache.today = data[data.length - 1]
+          setMetrics(data)
+          setToday(data[data.length - 1])
+          setIsRealData(true)
+        }
       })
       getTrainingSessions(u.id, 5).then(({ data }) => {
         if (!active) return
-        if (data?.length) setSessions(data)
+        if (data?.length) { _cache.sessions = data; setSessions(data) }
       })
     })
 

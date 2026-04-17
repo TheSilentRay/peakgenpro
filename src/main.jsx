@@ -14,20 +14,18 @@ import Profile from './pages/Profile'
 import './styles/global.css'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Landing />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/connect-garmin" element={<GarminConnect />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/training" element={<Training />} />
-        <Route path="/recovery" element={<Recovery />} />
-        <Route path="/nutrition" element={<Nutrition />} />
-        <Route path="/coach" element={<AICoach />} />
-        <Route path="/profile" element={<Profile />} />
-      </Routes>
-    </BrowserRouter>
-  </React.StrictMode>
+  <BrowserRouter>
+    <Routes>
+      <Route path="/" element={<Landing />} />
+      <Route path="/register" element={<Register />} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/connect-garmin" element={<GarminConnect />} />
+      <Route path="/dashboard" element={<Dashboard />} />
+      <Route path="/training" element={<Training />} />
+      <Route path="/recovery" element={<Recovery />} />
+      <Route path="/nutrition" element={<Nutrition />} />
+      <Route path="/coach" element={<AICoach />} />
+      <Route path="/profile" element={<Profile />} />
+    </Routes>
+  </BrowserRouter>
 )

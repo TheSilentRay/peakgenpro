@@ -4,6 +4,8 @@ import AppLayout from '../components/AppLayout'
 import { supabase, getDailyMetrics } from '../lib/supabase'
 import { DEMO_METRICS, DEMO_TODAY } from '../lib/demoData'
 
+const _cache = { metrics: null, today: null }
+
 const DataBadge = ({ isReal }) => (
   <span style={{
     fontSize: 10, fontFamily: "'JetBrains Mono',monospace", letterSpacing: 1,
@@ -17,17 +19,24 @@ const DataBadge = ({ isReal }) => (
 )
 
 export default function Recovery() {
-  const [metrics, setMetrics] = useState(DEMO_METRICS)
-  const [today, setToday] = useState(DEMO_TODAY)
-  const [isRealData, setIsRealData] = useState(false)
+  const [metrics, setMetrics] = useState(_cache.metrics || DEMO_METRICS)
+  const [today, setToday] = useState(_cache.today || DEMO_TODAY)
+  const [isRealData, setIsRealData] = useState(!!_cache.metrics)
 
   useEffect(() => {
+    if (_cache.metrics) return
     let active = true
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!active || !user) return
       getDailyMetrics(user.id, 30).then(({ data }) => {
         if (!active) return
-        if (data?.length) { setMetrics(data); setToday(data[data.length - 1]); setIsRealData(true) }
+        if (data?.length) {
+          _cache.metrics = data
+          _cache.today = data[data.length - 1]
+          setMetrics(data)
+          setToday(data[data.length - 1])
+          setIsRealData(true)
+        }
       })
     })
     return () => { active = false }

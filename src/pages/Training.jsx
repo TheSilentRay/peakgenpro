@@ -14,6 +14,8 @@ const ZONES = [
 
 const DAYS_ES = ['D', 'L', 'M', 'X', 'J', 'V', 'S'] // getDay() 0=Sun
 
+const _cache = { sessions: null, metrics: null }
+
 const DataBadge = ({ isReal }) => (
   <span style={{
     fontSize: 10, fontFamily: "'JetBrains Mono',monospace", letterSpacing: 1,
@@ -27,21 +29,22 @@ const DataBadge = ({ isReal }) => (
 )
 
 export default function Training() {
-  const [sessions, setSessions] = useState(DEMO_SESSIONS)
-  const [metrics, setMetrics] = useState(DEMO_METRICS)
-  const [isRealData, setIsRealData] = useState(false)
+  const [sessions, setSessions] = useState(_cache.sessions || DEMO_SESSIONS)
+  const [metrics, setMetrics] = useState(_cache.metrics || DEMO_METRICS)
+  const [isRealData, setIsRealData] = useState(!!_cache.sessions)
 
   useEffect(() => {
+    if (_cache.sessions) return
     let active = true
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!active || !user) return
       getTrainingSessions(user.id).then(({ data }) => {
         if (!active) return
-        if (data?.length) { setSessions(data); setIsRealData(true) }
+        if (data?.length) { _cache.sessions = data; setSessions(data); setIsRealData(true) }
       })
       getDailyMetrics(user.id, 8).then(({ data }) => {
         if (!active) return
-        if (data?.length) setMetrics(data)
+        if (data?.length) { _cache.metrics = data; setMetrics(data) }
       })
     })
     return () => { active = false }

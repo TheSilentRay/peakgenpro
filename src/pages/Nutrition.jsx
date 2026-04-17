@@ -3,6 +3,8 @@ import AppLayout from '../components/AppLayout'
 import { supabase, getDailyMetrics, getTrainingSessions } from '../lib/supabase'
 import { DEMO_NUTRITION } from '../lib/demoData'
 
+const _cache = { today: null, sessions: null }
+
 const DataBadge = ({ isReal, label }) => (
   <span style={{
     fontSize: 10, fontFamily: "'JetBrains Mono',monospace", letterSpacing: 1,
@@ -16,22 +18,27 @@ const DataBadge = ({ isReal, label }) => (
 )
 
 export default function Nutrition() {
-  const [today, setToday] = useState(null)
-  const [recentSessions, setRecentSessions] = useState([])
-  const [isRealData, setIsRealData] = useState(false)
+  const [today, setToday] = useState(_cache.today || null)
+  const [recentSessions, setRecentSessions] = useState(_cache.sessions || [])
+  const [isRealData, setIsRealData] = useState(!!_cache.today)
   const n = DEMO_NUTRITION // meals are always demo — Garmin doesn't sync food logs
 
   useEffect(() => {
+    if (_cache.today) return
     let active = true
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!active || !user) return
       getDailyMetrics(user.id, 1).then(({ data }) => {
         if (!active) return
-        if (data?.length) { setToday(data[data.length - 1]); setIsRealData(true) }
+        if (data?.length) {
+          _cache.today = data[data.length - 1]
+          setToday(_cache.today)
+          setIsRealData(true)
+        }
       })
       getTrainingSessions(user.id, 5).then(({ data }) => {
         if (!active) return
-        if (data?.length) setRecentSessions(data)
+        if (data?.length) { _cache.sessions = data; setRecentSessions(data) }
       })
     })
     return () => { active = false }
