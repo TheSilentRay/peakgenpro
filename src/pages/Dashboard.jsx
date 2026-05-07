@@ -3,9 +3,10 @@ import { RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer, Line
 import AppLayout from '../components/AppLayout'
 import { supabase, getDailyMetrics, getTrainingSessions } from '../lib/supabase'
 import { DEMO_METRICS, DEMO_SESSIONS, DEMO_TODAY, DEMO_USER } from '../lib/demoData'
+import { getCacheVersion } from '../lib/cacheInvalidator'
 
-// Module-level cache — survives navigation (component unmount/remount)
-const _cache = { metrics: null, sessions: null, today: null, user: null }
+// Module-level cache — survives navigation; _v tracks sync version for invalidation
+const _cache = { metrics: null, sessions: null, today: null, user: null, _v: -1 }
 
 const DataBadge = ({ isReal }) => (
   <span style={{
@@ -27,8 +28,10 @@ export default function Dashboard() {
   const [isRealData, setIsRealData] = useState(!!_cache.metrics)
 
   useEffect(() => {
-    // Skip fetch if cache already has real data
-    if (_cache.metrics) return
+    // Skip fetch if cache is fresh (same sync version)
+    if (_cache.metrics && _cache._v === getCacheVersion()) return
+    // Cache is stale after a sync — clear it and re-fetch
+    _cache.metrics = null; _cache.sessions = null; _cache.today = null; _cache.user = null
     let active = true
 
     supabase.auth.getUser().then(({ data: { user: u } }) => {
@@ -40,6 +43,7 @@ export default function Dashboard() {
         if (data?.length) {
           _cache.metrics = data
           _cache.today = data[data.length - 1]
+          _cache._v = getCacheVersion()
           setMetrics(data)
           setToday(data[data.length - 1])
           setIsRealData(true)

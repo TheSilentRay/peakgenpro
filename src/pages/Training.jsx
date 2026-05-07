@@ -3,6 +3,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recha
 import AppLayout from '../components/AppLayout'
 import { supabase, getTrainingSessions, getDailyMetrics } from '../lib/supabase'
 import { DEMO_SESSIONS, DEMO_METRICS } from '../lib/demoData'
+import { getCacheVersion } from '../lib/cacheInvalidator'
 
 const ZONES = [
   { name: 'Z1 Recuperación', color: '#5BB8FF', range: '< 120 bpm', pct: 18 },
@@ -14,7 +15,7 @@ const ZONES = [
 
 const DAYS_ES = ['D', 'L', 'M', 'X', 'J', 'V', 'S'] // getDay() 0=Sun
 
-const _cache = { sessions: null, metrics: null }
+const _cache = { sessions: null, metrics: null, _v: -1 }
 
 const DataBadge = ({ isReal }) => (
   <span style={{
@@ -34,13 +35,14 @@ export default function Training() {
   const [isRealData, setIsRealData] = useState(!!_cache.sessions)
 
   useEffect(() => {
-    if (_cache.sessions) return
+    if (_cache.sessions && _cache._v === getCacheVersion()) return
+    _cache.sessions = null; _cache.metrics = null
     let active = true
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!active || !user) return
       getTrainingSessions(user.id).then(({ data }) => {
         if (!active) return
-        if (data?.length) { _cache.sessions = data; setSessions(data); setIsRealData(true) }
+        if (data?.length) { _cache.sessions = data; _cache._v = getCacheVersion(); setSessions(data); setIsRealData(true) }
       })
       getDailyMetrics(user.id, 8).then(({ data }) => {
         if (!active) return

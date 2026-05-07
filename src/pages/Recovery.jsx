@@ -3,8 +3,9 @@ import { AreaChart, Area, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveCont
 import AppLayout from '../components/AppLayout'
 import { supabase, getDailyMetrics } from '../lib/supabase'
 import { DEMO_METRICS, DEMO_TODAY } from '../lib/demoData'
+import { getCacheVersion } from '../lib/cacheInvalidator'
 
-const _cache = { metrics: null, today: null }
+const _cache = { metrics: null, today: null, _v: -1 }
 
 const DataBadge = ({ isReal }) => (
   <span style={{
@@ -24,7 +25,8 @@ export default function Recovery() {
   const [isRealData, setIsRealData] = useState(!!_cache.metrics)
 
   useEffect(() => {
-    if (_cache.metrics) return
+    if (_cache.metrics && _cache._v === getCacheVersion()) return
+    _cache.metrics = null; _cache.today = null
     let active = true
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!active || !user) return
@@ -33,6 +35,7 @@ export default function Recovery() {
         if (data?.length) {
           _cache.metrics = data
           _cache.today = data[data.length - 1]
+          _cache._v = getCacheVersion()
           setMetrics(data)
           setToday(data[data.length - 1])
           setIsRealData(true)

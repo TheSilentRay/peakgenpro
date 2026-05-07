@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { invalidateCaches } from '../lib/cacheInvalidator'
 
 export default function GarminConnect() {
   const navigate = useNavigate()
@@ -49,6 +50,7 @@ export default function GarminConnect() {
 
       if (!syncRes.ok || !syncData?.success) throw new Error(syncData?.error || 'La sincronización falló sin mensaje de error')
 
+      invalidateCaches() // force all dashboards to re-fetch fresh data
       setSyncStats(syncData)
       setStep('done')
 

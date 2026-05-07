@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react'
 import AppLayout from '../components/AppLayout'
 import { supabase, getDailyMetrics, getTrainingSessions } from '../lib/supabase'
 import { DEMO_NUTRITION } from '../lib/demoData'
+import { getCacheVersion } from '../lib/cacheInvalidator'
 
-const _cache = { today: null, sessions: null }
+const _cache = { today: null, sessions: null, _v: -1 }
 
 const DataBadge = ({ isReal, label }) => (
   <span style={{
@@ -24,7 +25,8 @@ export default function Nutrition() {
   const n = DEMO_NUTRITION // meals are always demo — Garmin doesn't sync food logs
 
   useEffect(() => {
-    if (_cache.today) return
+    if (_cache.today && _cache._v === getCacheVersion()) return
+    _cache.today = null; _cache.sessions = null
     let active = true
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!active || !user) return
@@ -32,6 +34,7 @@ export default function Nutrition() {
         if (!active) return
         if (data?.length) {
           _cache.today = data[data.length - 1]
+          _cache._v = getCacheVersion()
           setToday(_cache.today)
           setIsRealData(true)
         }

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import AppLayout from '../components/AppLayout'
 import { supabase, saveProfile } from '../lib/supabase'
 import { DEMO_USER } from '../lib/demoData'
+import { invalidateCaches } from '../lib/cacheInvalidator'
 
 function timeAgo(dateStr) {
   if (!dateStr) return '—'
@@ -80,6 +81,7 @@ export default function Profile() {
       if (!syncRes.ok || !data?.success) {
         setGarminMsg(data?.error || 'La sincronización falló')
       } else {
+        invalidateCaches() // force all dashboards to re-fetch fresh data
         setGarminMsg(`✓ Sincronizado: ${data.sessions_synced} actividades, ${data.metrics_synced} días`)
         if (u) await loadGarmin(u.id)
       }
