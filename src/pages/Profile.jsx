@@ -67,7 +67,15 @@ export default function Profile() {
         },
         body: JSON.stringify({}),
       })
-      const data = await syncRes.json()
+
+      let data
+      try {
+        data = await syncRes.json()
+      } catch {
+        setGarminMsg(`Error del servidor (${syncRes.status}). La sincronización tardó demasiado o falló inesperadamente. Intenta de nuevo.`)
+        setGarminAction('')
+        return
+      }
 
       if (!syncRes.ok || !data?.success) {
         setGarminMsg(data?.error || 'La sincronización falló')

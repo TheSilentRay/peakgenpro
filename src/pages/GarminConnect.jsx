@@ -39,7 +39,13 @@ export default function GarminConnect() {
         },
         body: JSON.stringify({}),
       })
-      const syncData = await syncRes.json()
+
+      let syncData
+      try {
+        syncData = await syncRes.json()
+      } catch {
+        throw new Error(`Error del servidor (${syncRes.status}). La sincronización tardó demasiado o falló inesperadamente. Intenta de nuevo.`)
+      }
 
       if (!syncRes.ok || !syncData?.success) throw new Error(syncData?.error || 'La sincronización falló sin mensaje de error')
 

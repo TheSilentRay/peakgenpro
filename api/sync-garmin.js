@@ -4,17 +4,17 @@
 const { createClient } = require('@supabase/supabase-js')
 const { GarminConnect } = require('garmin-connect')
 
-// Increase Vercel function timeout (Pro plan: up to 300s; Hobby: 10-15s)
-// If you hit timeout on Hobby, upgrade to Pro or reduce DAYS_TO_SYNC below.
-module.exports.config = { maxDuration: 60 }
-
-const DAYS_TO_SYNC = 30
+// Sync last 7 days — keeps total wall-clock time well under Vercel Hobby's 10-15s limit.
+// Within each day, the 4 Garmin calls run in parallel (Promise.all), cutting per-day
+// latency from ~4s sequential to ~1-2s. Total estimated time: ~15-20s on Hobby plan.
+// Upgrade to Vercel Pro (300s max) if you need more history.
+const DAYS_TO_SYNC = 7
 
 const safeCall = async (fn) => {
   try { return await fn() } catch { return null }
 }
 
-module.exports = async function handler(req, res) {
+async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Headers', 'authorization, x-client-info, apikey, content-type')
 
@@ -84,9 +84,14 @@ module.exports = async function handler(req, res) {
     const startDate = new Date(today)
     startDate.setDate(today.getDate() - (DAYS_TO_SYNC - 1))
 
-    // ── 1. Activities ────────────────────────────────────────────────
-    const activities = await safeCall(() => gc.getActivities(0, 30)) ?? []
-    for (const activity of activities) {
+    // ── 1. Activities + Body Battery — fetch concurrently ────────────
+    const [activities, bbData] = await Promise.all([
+      safeCall(() => gc.getActivities(0, 30)),
+      safeCall(() => gc.getBodyBattery([startDate, today])),
+    ])
+
+    // Save activities
+    for (const activity of (activities ?? [])) {
       const saved = await safeCall(() =>
         supabase.from('training_sessions').upsert({
           user_id: userId,
@@ -109,10 +114,8 @@ module.exports = async function handler(req, res) {
       if (saved !== null) sessionsSynced++
     }
 
-    // ── 2. Body Battery ──────────────────────────────────────────────
+    // Build body battery lookup by date
     const bodyBatteryByDate = {}
-    // garmin-connect expects a date-range array: [startDate, endDate]
-    const bbData = await safeCall(() => gc.getBodyBattery([startDate, today]))
     if (Array.isArray(bbData)) {
       for (const entry of bbData) {
         const ts = entry.startTimestampLocal ?? entry.startTimestampGMT
@@ -124,21 +127,34 @@ module.exports = async function handler(req, res) {
       }
     }
 
-    // ── 3. Daily Metrics ─────────────────────────────────────────────
+    // ── 2. Daily Metrics — 4 Garmin calls per day run in parallel ────
     const gcAny = gc
     for (let i = DAYS_TO_SYNC - 1; i >= 0; i--) {
       const date = new Date(today)
       date.setDate(today.getDate() - i)
       const dateStr = date.toISOString().split('T')[0]
 
+      // Run all 4 data sources concurrently for this date
+      const [sleepData, summaryRaw, hrData, hrvRaw] = await Promise.all([
+        safeCall(() => gc.getSleepData(date)),
+        safeCall(async () => {
+          let s = await safeCall(() => gcAny.getDailySummary?.(date))
+          if (!s) s = await safeCall(() => gcAny.getUserSummary?.(date))
+          if (!s) s = await safeCall(() => gcAny.getDailyHealthStats?.(date))
+          return s
+        }),
+        safeCall(() => gc.getHeartRate(date)),
+        safeCall(async () => {
+          let h = await safeCall(() => gcAny.getHrv?.(date))
+          if (!h) h = await safeCall(() => gcAny.getHRV?.(date))
+          return h
+        }),
+      ])
+
+      // Parse sleep
       let sleepHours = null, sleepScore = null, sleepDeepHours = null
       let sleepRemHours = null, sleepLightHours = null, sleepAwakeHours = null
-      let hrvMs = null, restingHr = null, stressScore = null
-      let steps = null, caloriesActive = null, caloriesTotal = null
       const rawData = {}
-
-      // Sleep
-      const sleepData = await safeCall(() => gc.getSleepData(date))
       const dto = sleepData?.dailySleepDTO
       if (dto) {
         sleepHours = dto.sleepTimeSeconds ? parseFloat((dto.sleepTimeSeconds / 3600).toFixed(2)) : null
@@ -150,41 +166,38 @@ module.exports = async function handler(req, res) {
         rawData.sleep = sleepData
       }
 
-      // Daily summary — try each method in order until one succeeds
-      let summary = await safeCall(() => gcAny.getDailySummary?.(date))
-      if (!summary) summary = await safeCall(() => gcAny.getUserSummary?.(date))
-      if (!summary) summary = await safeCall(() => gcAny.getDailyHealthStats?.(date))
-      if (summary) {
-        steps = summary.totalSteps ?? null
-        caloriesActive = summary.activeKilocalories ?? null
-        caloriesTotal = summary.totalKilocalories ?? null
-        stressScore = summary.avgStressLevel ?? null
-        restingHr = summary.restingHeartRate ?? null
-        rawData.summary = summary
+      // Parse daily summary
+      let steps = null, caloriesActive = null, caloriesTotal = null
+      let stressScore = null, restingHr = null
+      if (summaryRaw) {
+        steps = summaryRaw.totalSteps ?? null
+        caloriesActive = summaryRaw.activeKilocalories ?? null
+        caloriesTotal = summaryRaw.totalKilocalories ?? null
+        stressScore = summaryRaw.avgStressLevel ?? null
+        restingHr = summaryRaw.restingHeartRate ?? null
+        rawData.summary = summaryRaw
       }
 
-      // Resting HR fallback
-      if (!restingHr) {
-        const hrData = await safeCall(() => gc.getHeartRate(date))
-        restingHr = hrData?.restingHeartRate ?? null
-        if (hrData) rawData.heartRate = hrData
+      // Resting HR fallback from heart rate endpoint
+      if (!restingHr && hrData) {
+        restingHr = hrData.restingHeartRate ?? null
+        rawData.heartRate = hrData
       }
 
-      // HRV
-      let hrvData = await safeCall(() => gcAny.getHrv?.(date))
-      if (!hrvData) hrvData = await safeCall(() => gcAny.getHRV?.(date))
-      if (hrvData?.hrvSummary) {
-        hrvMs = hrvData.hrvSummary.lastNight ?? hrvData.hrvSummary.weeklyAvg ?? null
-        rawData.hrv = hrvData
+      // Parse HRV
+      let hrvMs = null
+      if (hrvRaw?.hrvSummary) {
+        hrvMs = hrvRaw.hrvSummary.lastNight ?? hrvRaw.hrvSummary.weeklyAvg ?? null
+        rawData.hrv = hrvRaw
       }
 
       // Composite readiness score
       let readinessScore = null
       let weightedSum = 0, totalWeight = 0
-      if (sleepScore !== null) { weightedSum += sleepScore * 0.35; totalWeight += 0.35 }
-      if (hrvMs !== null) { weightedSum += Math.min(100, (hrvMs / 80) * 100) * 0.30; totalWeight += 0.30 }
-      if (bodyBatteryByDate[dateStr] !== undefined) { weightedSum += bodyBatteryByDate[dateStr] * 0.20; totalWeight += 0.20 }
-      if (stressScore !== null) { weightedSum += (100 - stressScore) * 0.15; totalWeight += 0.15 }
+      if (sleepScore !== null)                          { weightedSum += sleepScore * 0.35; totalWeight += 0.35 }
+      if (hrvMs !== null)                               { weightedSum += Math.min(100, (hrvMs / 80) * 100) * 0.30; totalWeight += 0.30 }
+      if (bodyBatteryByDate[dateStr] !== undefined)     { weightedSum += bodyBatteryByDate[dateStr] * 0.20; totalWeight += 0.20 }
+      if (stressScore !== null)                         { weightedSum += (100 - stressScore) * 0.15; totalWeight += 0.15 }
       if (totalWeight >= 0.35) readinessScore = Math.round(weightedSum / totalWeight)
 
       const { error: dbError } = await supabase.from('daily_metrics').upsert({
@@ -239,3 +252,8 @@ module.exports = async function handler(req, res) {
     return res.status(400).json({ success: false, error: msg })
   }
 }
+
+// IMPORTANT: assign module.exports BEFORE adding .config, otherwise the
+// property assignment on line 9 of the old version was overwritten.
+module.exports = handler
+module.exports.config = { maxDuration: 60 }
