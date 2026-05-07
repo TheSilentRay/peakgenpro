@@ -57,26 +57,30 @@ INSTRUCCIONES:
       parts: [{ text: m.content }],
     }))
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: systemPrompt }] },
-          contents: geminiMessages,
-          generationConfig: {
-            maxOutputTokens: 1000,
-            temperature: 0.7,
-          },
-        }),
-      }
-    )
+    // Try models in order — fall back if overloaded or unavailable
+    const MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash-lite', 'gemini-flash-lite-latest']
+    const body = JSON.stringify({
+      systemInstruction: { parts: [{ text: systemPrompt }] },
+      contents: geminiMessages,
+      generationConfig: { maxOutputTokens: 1000, temperature: 0.7 },
+    })
 
-    const data = await response.json()
+    let data, response
+    for (const model of MODELS) {
+      response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`,
+        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body }
+      )
+      data = await response.json()
+      // Stop on success or a real error (not overload/unavailable)
+      if (response.ok) break
+      const errMsg = data.error?.message ?? ''
+      const isRetryable = /high demand|overload|unavailable|quota|503|429/i.test(errMsg) || response.status === 503 || response.status === 429
+      if (!isRetryable) break
+    }
+
     if (!response.ok) {
-      const errMsg = data.error?.message ?? `Gemini API error ${response.status}`
-      throw new Error(errMsg)
+      throw new Error(data.error?.message ?? `Gemini API error ${response.status}`)
     }
 
     // Normalize to a simple { text } response the frontend can read
