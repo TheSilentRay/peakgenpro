@@ -8,7 +8,8 @@ const { GarminConnect } = require('garmin-connect')
 // Within each day, the 4 Garmin calls run in parallel (Promise.all), cutting per-day
 // latency from ~4s sequential to ~1-2s. Total estimated time: ~15-20s on Hobby plan.
 // Upgrade to Vercel Pro (300s max) if you need more history.
-const DAYS_TO_SYNC = 7
+const DAYS_TO_SYNC = 3 // Vercel Hobby plan hard-caps functions at 10s; 3 days fits safely.
+// Upgrade to Vercel Pro to increase this back to 7+ days (300s limit on Pro).
 
 const safeCall = async (fn) => {
   try { return await fn() } catch { return null }
