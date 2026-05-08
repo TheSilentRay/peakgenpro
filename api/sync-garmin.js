@@ -245,10 +245,11 @@ async function handler(req, res) {
     const msg = error instanceof Error ? error.message : String(error)
     console.error('Garmin sync failed:', msg)
 
-    await supabase.from('garmin_credentials')
-      .update({ sync_status: 'error' })
-      .eq('user_id', userId)
-      .catch(() => {})
+    try {
+      await supabase.from('garmin_credentials')
+        .update({ sync_status: 'error' })
+        .eq('user_id', userId)
+    } catch (_) {}
 
     return res.status(400).json({ success: false, error: msg })
   }
