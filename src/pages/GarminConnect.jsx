@@ -30,29 +30,35 @@ export default function GarminConnect() {
 
       if (credError) throw new Error(`Error guardando credenciales: ${credError.message}`)
 
-      // Call the Vercel API route — does the real Garmin API calls server-side
+      // Credentials saved — show success immediately, then try sync in background
+      // This prevents the user from getting stuck if the sync times out or crashes
+      setStep('done')
+
+      // Background sync — errors are non-blocking
       const { data: { session } } = await supabase.auth.getSession()
-      const syncRes = await fetch('/api/sync-garmin', {
+      fetch('/api/sync-garmin', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session?.access_token}`,
         },
         body: JSON.stringify({}),
+      }).then(async res => {
+        try {
+          const data = await res.json()
+          if (data?.success) {
+            invalidateCaches()
+            setSyncStats(data)
+          } else {
+            // Sync failed but account is connected — user can retry from sidebar
+            setSyncStats({ sessions_synced: 0, metrics_synced: 0, syncWarning: data?.error || 'Sync pendiente — usa el botón 🔄 en el sidebar para reintentar.' })
+          }
+        } catch {
+          setSyncStats({ sessions_synced: 0, metrics_synced: 0, syncWarning: 'Sync pendiente — usa el botón 🔄 en el sidebar para reintentar.' })
+        }
+      }).catch(() => {
+        setSyncStats({ sessions_synced: 0, metrics_synced: 0, syncWarning: 'Sync pendiente — usa el botón 🔄 en el sidebar para reintentar.' })
       })
-
-      let syncData
-      try {
-        syncData = await syncRes.json()
-      } catch {
-        throw new Error(`Error del servidor (${syncRes.status}). La sincronización tardó demasiado o falló inesperadamente. Intenta de nuevo.`)
-      }
-
-      if (!syncRes.ok || !syncData?.success) throw new Error(syncData?.error || 'La sincronización falló sin mensaje de error')
-
-      invalidateCaches() // force all dashboards to re-fetch fresh data
-      setSyncStats(syncData)
-      setStep('done')
 
     } catch (err) {
       console.error('Garmin connect error:', err)
@@ -167,10 +173,12 @@ export default function GarminConnect() {
             <div style={{ textAlign: 'center', padding: '20px 0' }}>
               <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(0,229,160,0.1)', border: '1px solid rgba(0,229,160,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px', fontSize: 28 }}>✓</div>
               <h3 style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 24, letterSpacing: 1, color: '#00E5A0', marginBottom: 8 }}>¡CONECTADO!</h3>
-              <p style={{ fontSize: 14, color: '#7A8E88', marginBottom: 8, lineHeight: 1.6 }}>
-                Sincronización completada con éxito.
+              <p style={{ fontSize: 14, color: '#7A8E88', marginBottom: 16, lineHeight: 1.6 }}>
+                Cuenta Garmin vinculada correctamente.
               </p>
-              {syncStats && (
+
+              {/* Sync results or warning */}
+              {syncStats && !syncStats.syncWarning && (
                 <div style={{ display: 'flex', gap: 20, justifyContent: 'center', marginBottom: 24, fontSize: 13 }}>
                   <div style={{ textAlign: 'center' }}>
                     <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 28, color: '#00E5A0' }}>{syncStats.sessions_synced}</div>
@@ -182,6 +190,15 @@ export default function GarminConnect() {
                   </div>
                 </div>
               )}
+              {syncStats?.syncWarning && (
+                <div style={{ background: 'rgba(255,179,71,0.08)', border: '1px solid rgba(255,179,71,0.2)', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#FFB347', marginBottom: 20, lineHeight: 1.5, textAlign: 'left' }}>
+                  ⚠ {syncStats.syncWarning}
+                </div>
+              )}
+              {!syncStats && (
+                <p style={{ fontSize: 13, color: '#7A8E88', marginBottom: 20 }}>Sincronizando datos en segundo plano...</p>
+              )}
+
               <button
                 onClick={() => navigate('/dashboard')}
                 style={{ background: '#00E5A0', color: '#060a08', fontWeight: 500, fontSize: 15, padding: '13px 32px', border: 'none', borderRadius: 8, cursor: 'pointer' }}
