@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { supabase, signOut } from '../lib/supabase'
+import { invalidateCaches } from '../lib/cacheInvalidator'
 
 const links = [
   { to: '/dashboard', label: 'Dashboard', icon: '⚡' },
@@ -23,18 +24,53 @@ function timeAgo(dateStr) {
 export default function Sidebar() {
   const navigate = useNavigate()
   const [garmin, setGarmin] = useState(null) // null = loading, false = not connected
+  const [syncing, setSyncing] = useState(false)
+  const [syncMsg, setSyncMsg] = useState('')
+
+  const loadGarmin = (user) => {
+    supabase
+      .from('garmin_credentials')
+      .select('garmin_username, last_sync_at, sync_status')
+      .eq('user_id', user.id)
+      .single()
+      .then(({ data }) => setGarmin(data || false))
+  }
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) return
-      supabase
-        .from('garmin_credentials')
-        .select('garmin_username, last_sync_at, sync_status')
-        .eq('user_id', user.id)
-        .single()
-        .then(({ data }) => setGarmin(data || false))
+      loadGarmin(user)
     })
   }, [])
+
+  const handleQuickSync = async (e) => {
+    e.stopPropagation() // don't navigate to profile
+    setSyncing(true)
+    setSyncMsg('')
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/sync-garmin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+        body: JSON.stringify({}),
+      })
+      let data
+      try { data = await res.json() } catch { data = { success: false, error: `Error ${res.status}` } }
+      if (data?.success) {
+        invalidateCaches()
+        setGarmin(g => ({ ...g, last_sync_at: new Date().toISOString(), sync_status: 'success' }))
+        setSyncMsg('✓')
+        if (user) loadGarmin(user)
+      } else {
+        setSyncMsg('✗')
+      }
+    } catch {
+      setSyncMsg('✗')
+    }
+    setSyncing(false)
+    setTimeout(() => setSyncMsg(''), 3000)
+  }
 
   const handleSignOut = async () => {
     await signOut()
@@ -108,6 +144,22 @@ export default function Sidebar() {
                   <span style={{ fontSize: 10, color: '#00E5A0', marginLeft: 'auto', opacity: .6 }}>datos reales ✓</span>
                 )}
               </div>
+              {isConnected && (
+                <button
+                  onClick={handleQuickSync}
+                  disabled={syncing}
+                  title="Sincronizar ahora"
+                  style={{
+                    marginTop: 8, width: '100%', background: 'rgba(0,229,160,0.08)',
+                    border: '1px solid rgba(0,229,160,0.2)', borderRadius: 6,
+                    color: syncing ? '#7A8E88' : '#00E5A0', fontSize: 11,
+                    padding: '5px 0', cursor: syncing ? 'not-allowed' : 'pointer',
+                    fontFamily: "'JetBrains Mono',monospace", letterSpacing: 0.5,
+                  }}
+                >
+                  {syncing ? '⏳ Sincronizando...' : syncMsg === '✓' ? '✓ Sincronizado' : syncMsg === '✗' ? '✗ Error' : '🔄 Sincronizar'}
+                </button>
+              )}
             </>
           )}
         </div>
