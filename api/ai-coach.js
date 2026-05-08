@@ -62,7 +62,7 @@ INSTRUCCIONES:
     const body = JSON.stringify({
       systemInstruction: { parts: [{ text: systemPrompt }] },
       contents: geminiMessages,
-      generationConfig: { maxOutputTokens: 1000, temperature: 0.7 },
+      generationConfig: { maxOutputTokens: 2048, temperature: 0.7 },
     })
 
     let data, response
@@ -93,3 +93,6 @@ INSTRUCCIONES:
     return res.status(400).json({ error: msg })
   }
 }
+
+// Must be set AFTER module.exports assignment or it gets overwritten
+module.exports.config = { maxDuration: 60 }
