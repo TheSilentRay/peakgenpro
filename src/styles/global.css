@@ -86,3 +86,51 @@ input, textarea { font-family: var(--font-body); }
   line-height: 1.05;
   letter-spacing: 1px;
 }
+
+/* ── Responsive grid utilities ── */
+.g-4   { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.g-3   { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.g-2   { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.g-2-sm{ display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.g-sidebar  { display: grid; grid-template-columns: 260px 1fr; gap: 20px; }
+.g-chart    { display: grid; grid-template-columns: 1fr 280px; gap: 20px; }
+.g-recovery { display: grid; grid-template-columns: 200px 1fr 1fr; gap: 16px; }
+
+/* ── App shell ── */
+.app-main { flex: 1; overflow: auto; padding: 32px 40px; }
+
+/* ── Hamburger (hidden on desktop) ── */
+.hamburger-btn {
+  display: none; align-items: center; justify-content: center;
+  position: fixed; top: 14px; left: 14px; z-index: 300;
+  width: 40px; height: 40px;
+  background: #0D1316; border: 1px solid rgba(0,229,160,0.25); border-radius: 8px;
+  color: #00E5A0; font-size: 20px; cursor: pointer;
+}
+
+/* ── Sidebar backdrop (hidden on desktop) ── */
+.sidebar-backdrop {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.65); z-index: 199;
+}
+
+/* ── Stats bar items (Landing) ── */
+.stats-item { text-align: center; padding: 0 20px; }
+
+/* ── Mobile breakpoint ── */
+@media (max-width: 768px) {
+  .app-main { padding: 72px 16px 32px; }
+  .hamburger-btn { display: flex; }
+  .sidebar-backdrop { display: block; }
+
+  .g-4   { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .g-3   { grid-template-columns: 1fr 1fr; }
+  .g-2, .g-2-sm, .g-sidebar, .g-chart, .g-recovery { grid-template-columns: 1fr; }
+
+  .stats-item { border-left: none !important; padding: 12px 0; }
+}
+
+@media (max-width: 480px) {
+  .app-main { padding: 64px 12px 24px; }
+  .g-3 { grid-template-columns: 1fr; }
+}

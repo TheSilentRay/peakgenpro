@@ -127,7 +127,7 @@ export default function Profile() {
         <h1 style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 32, letterSpacing: 1 }}>ATHLETE PROFILE</h1>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: 20, marginBottom: 20 }}>
+      <div className="g-sidebar" style={{ marginBottom: 20 }}>
         {/* Left column */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {/* Avatar */}

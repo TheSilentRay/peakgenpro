@@ -116,14 +116,14 @@ export default function Dashboard() {
       </div>
 
       {/* KPI row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 24 }}>
+      <div className="g-4" style={{ marginBottom: 24 }}>
         {statCard('READINESS', today.readiness_score, '', `↑ +4 vs ayer`, today.readiness_score >= 70 ? '#00E5A0' : today.readiness_score >= 50 ? '#FFB347' : '#ff6b6b')}
         {statCard('HRV', today.hrv_ms, 'ms', 'Zona óptima', '#5BB8FF')}
         {statCard('SUEÑO', today.sleep_hours, 'h', `Score: ${today.sleep_score}`, '#b088ff')}
         {statCard('BODY BATTERY', today.body_battery, '%', 'Recargando bien', '#FFB347')}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 20, marginBottom: 20 }}>
+      <div className="g-chart" style={{ marginBottom: 20 }}>
         {/* Chart */}
         <div style={{ background: '#0D1316', border: '1px solid rgba(0,229,160,0.1)', borderRadius: 10, padding: 20 }}>
           <div style={{ fontSize: 11, fontFamily: "'JetBrains Mono',monospace", color: '#7A8E88', letterSpacing: .5, marginBottom: 16 }}>
@@ -169,7 +169,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+      <div className="g-2">
         {/* Recent sessions */}
         <div style={{ background: '#0D1316', border: '1px solid rgba(0,229,160,0.1)', borderRadius: 10, padding: 20 }}>
           <div style={{ fontSize: 11, fontFamily: "'JetBrains Mono',monospace", color: '#7A8E88', letterSpacing: .5, marginBottom: 16 }}>ACTIVIDADES RECIENTES</div>

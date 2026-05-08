@@ -105,7 +105,7 @@ export default function Training() {
         </ResponsiveContainer>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
+      <div className="g-2" style={{ marginBottom: 20 }}>
         {/* HR Zones */}
         <div style={{ background: '#0D1316', border: '1px solid rgba(0,229,160,0.1)', borderRadius: 10, padding: 20 }}>
           <div style={{ fontSize: 11, fontFamily: "'JetBrains Mono',monospace", color: '#7A8E88', letterSpacing: .5, marginBottom: 16 }}>ZONAS DE FRECUENCIA CARDÍACA</div>
@@ -148,7 +148,7 @@ export default function Training() {
         <div style={{ fontSize: 11, fontFamily: "'JetBrains Mono',monospace", color: '#7A8E88', letterSpacing: .5, marginBottom: 16 }}>ACTIVIDADES RECIENTES</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {sessions.map((s, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 14px', background: '#111820', borderRadius: 8, border: '1px solid rgba(255,255,255,0.04)' }}>
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 14px', background: '#111820', borderRadius: 8, border: '1px solid rgba(255,255,255,0.04)', flexWrap: 'wrap' }}>
               <div style={{ width: 36, height: 36, borderRadius: 8, background: `${activityColor(s.activity_type)}15`, border: `1px solid ${activityColor(s.activity_type)}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>
                 {activityIcon(s.activity_type)}
               </div>

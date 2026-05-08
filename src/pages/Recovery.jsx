@@ -85,7 +85,7 @@ export default function Recovery() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr 1fr', gap: 16, marginBottom: 20 }}>
+      <div className="g-recovery" style={{ marginBottom: 20 }}>
         {/* Big score */}
         <div style={{ background: '#0D1316', border: `1px solid ${scoreColor}30`, borderRadius: 10, padding: 24, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
           <div style={{ fontSize: 11, fontFamily: "'JetBrains Mono',monospace", color: '#7A8E88', letterSpacing: .5, marginBottom: 12 }}>HOY</div>
@@ -145,7 +145,7 @@ export default function Recovery() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+      <div className="g-2">
         {/* Sleep stages */}
         <div style={{ background: '#0D1316', border: '1px solid rgba(0,229,160,0.1)', borderRadius: 10, padding: 20 }}>
           <div style={{ fontSize: 11, fontFamily: "'JetBrains Mono',monospace", color: '#7A8E88', letterSpacing: .5, marginBottom: 6 }}>FASES DE SUEÑO — ÚLTIMA NOCHE</div>

@@ -33,7 +33,7 @@ export default function Landing() {
         justifyContent: 'space-between', height: 60
       }}>
         <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 22, letterSpacing: 3, color: '#00E5A0' }}>PEAKGENPRO</span>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
           <button className="btn-ghost" onClick={() => navigate('/login')}>Iniciar sesión</button>
           <button className="btn-primary" onClick={() => navigate('/register')}>Empezar gratis →</button>
         </div>
@@ -88,11 +88,10 @@ export default function Landing() {
       </section>
 
       {/* STATS BAR */}
-      <div style={{
+      <div className="g-4" style={{
         background: '#0D1316', borderTop: '1px solid rgba(0,229,160,0.1)',
         borderBottom: '1px solid rgba(0,229,160,0.1)',
-        padding: '28px 5vw', display: 'grid',
-        gridTemplateColumns: 'repeat(4,1fr)'
+        padding: '28px 5vw'
       }}>
         {[
           { num: '94%', label: 'Precisión recovery score' },
@@ -100,7 +99,7 @@ export default function Landing() {
           { num: 'AI', label: 'Coach 24/7 con Claude' },
           { num: '0', label: 'Setup manual requerido' },
         ].map((s, i) => (
-          <div key={i} style={{ textAlign: 'center', padding: '0 20px', borderLeft: i > 0 ? '1px solid rgba(0,229,160,0.1)' : 'none' }}>
+          <div key={i} className="stats-item" style={{ borderLeft: i > 0 ? '1px solid rgba(0,229,160,0.1)' : 'none' }}>
             <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 36, color: '#00E5A0', letterSpacing: 1 }}>{s.num}</div>
             <div style={{ fontSize: 12, color: '#7A8E88', marginTop: 2 }}>{s.label}</div>
           </div>
@@ -114,8 +113,7 @@ export default function Landing() {
           <h2 className="section-title">TECNOLOGÍA DE ÉLITE<br />PARA ATLETAS SERIOS</h2>
         </div>
 
-        <div style={{
-          display: 'grid', gridTemplateColumns: 'repeat(3,1fr)',
+        <div className="g-3" style={{
           gap: '1px', background: 'rgba(0,229,160,0.1)',
           border: '1px solid rgba(0,229,160,0.1)', borderRadius: 12, overflow: 'hidden'
         }}>
@@ -183,7 +181,7 @@ export default function Landing() {
             </button>
           </div>
         ) : (
-          <form onSubmit={handleWaitlist} style={{ display: 'flex', gap: 10, maxWidth: 420, margin: '0 auto' }}>
+          <form onSubmit={handleWaitlist} style={{ display: 'flex', gap: 10, maxWidth: 420, margin: '0 auto', flexWrap: 'wrap' }}>
             <input
               type="email" value={email} onChange={e => setEmail(e.target.value)}
               placeholder="tu@email.com" required

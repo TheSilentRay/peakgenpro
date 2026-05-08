@@ -95,7 +95,7 @@ export default function Nutrition() {
 
       {/* ── Real Garmin data row: calories burned + steps ── */}
       {isRealData && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
+        <div className="g-2-sm" style={{ marginBottom: 20 }}>
           {/* Calories burned */}
           <div style={{ background: '#0D1316', border: '1px solid rgba(0,229,160,0.1)', borderRadius: 10, padding: 20 }}>
             <div style={{ fontSize: 11, fontFamily: "'JetBrains Mono',monospace", color: '#7A8E88', letterSpacing: .5, marginBottom: 8 }}>
@@ -139,7 +139,7 @@ export default function Nutrition() {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
+      <div className="g-2" style={{ marginBottom: 20 }}>
         {/* Calories intake — demo */}
         <div style={{ background: '#0D1316', border: '1px solid rgba(0,229,160,0.1)', borderRadius: 10, padding: 20 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
@@ -154,7 +154,7 @@ export default function Nutrition() {
             <div style={{ height: '100%', width: `${cPct}%`, background: '#00E5A0', borderRadius: 4, opacity: .8 }} />
           </div>
           <div style={{ fontSize: 12, color: '#7A8E88', marginBottom: 16 }}>Faltan {(n.calories_target - n.calories_consumed).toLocaleString()} kcal · {cPct}% completado</div>
-          <div style={{ display: 'flex', justifyContent: 'space-around' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-around', flexWrap: 'wrap', gap: 8 }}>
             <MacroRing value={n.protein_g} total={180} color="#ff6b6b" label="PROTEÍNA" unit="g" />
             <MacroRing value={n.carbs_g} total={320} color="#FFB347" label="CARBOS" unit="g" />
             <MacroRing value={n.fat_g} total={90} color="#5BB8FF" label="GRASAS" unit="g" />

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { supabase, signOut } from '../lib/supabase'
 import { invalidateCaches } from '../lib/cacheInvalidator'
+import useIsMobile from '../lib/useIsMobile'
 
 const links = [
   { to: '/dashboard', label: 'Dashboard', icon: '⚡' },
@@ -21,11 +22,12 @@ function timeAgo(dateStr) {
   return `hace ${Math.floor(diff / 86400)}d`
 }
 
-export default function Sidebar() {
+export default function Sidebar({ isOpen = false, onClose = () => {} }) {
   const navigate = useNavigate()
   const [garmin, setGarmin] = useState(null) // null = loading, false = not connected
   const [syncing, setSyncing] = useState(false)
   const [syncMsg, setSyncMsg] = useState('')
+  const isMobile = useIsMobile()
 
   const loadGarmin = (user) => {
     supabase
@@ -85,17 +87,27 @@ export default function Sidebar() {
     <aside style={{
       width: 220, minHeight: '100vh', background: '#0A0F12',
       borderRight: '1px solid rgba(0,229,160,0.08)',
-      display: 'flex', flexDirection: 'column', padding: '0 0 24px'
+      display: 'flex', flexDirection: 'column', padding: '0 0 24px',
+      position: 'relative',
+      ...(isMobile ? {
+        position: 'fixed', top: 0, left: isOpen ? 0 : -240,
+        height: '100vh', zIndex: 200,
+        transition: 'left 0.25s ease',
+        boxShadow: isOpen ? '4px 0 24px rgba(0,0,0,0.5)' : 'none',
+      } : {})
     }}>
-      <div style={{ padding: '24px 20px 20px', borderBottom: '1px solid rgba(0,229,160,0.08)' }}>
+      <div style={{ padding: '24px 20px 20px', borderBottom: '1px solid rgba(0,229,160,0.08)', position: 'relative' }}>
         <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 20, letterSpacing: 2, color: '#00E5A0' }}>
           PEAKGENPRO
         </span>
+        {isMobile && (
+          <button onClick={onClose} style={{ position: 'absolute', top: 18, right: 12, background: 'none', border: 'none', color: '#7A8E88', fontSize: 20, cursor: 'pointer', lineHeight: 1, padding: 4 }}>✕</button>
+        )}
       </div>
 
       <nav style={{ flex: 1, padding: '16px 12px' }}>
         {links.map(({ to, label, icon }) => (
-          <NavLink key={to} to={to} style={({ isActive }) => ({
+          <NavLink key={to} to={to} onClick={() => { if (isMobile) onClose() }} style={({ isActive }) => ({
             display: 'flex', alignItems: 'center', gap: 10,
             padding: '10px 12px', borderRadius: 8, marginBottom: 2,
             fontSize: 14, fontWeight: 400, textDecoration: 'none',
@@ -113,7 +125,7 @@ export default function Sidebar() {
       <div style={{ padding: '0 12px' }}>
         {/* Garmin status — clicking navigates to Profile to manage the connection */}
         <div
-          onClick={() => navigate('/profile')}
+          onClick={() => { navigate('/profile'); if (isMobile) onClose() }}
           style={{
             background: 'rgba(0,229,160,0.06)', border: `1px solid ${statusColor}30`,
             borderRadius: 8, padding: '12px', marginBottom: 12, cursor: 'pointer',
